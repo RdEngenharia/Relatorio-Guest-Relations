@@ -1,5 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 
@@ -63,6 +70,26 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 // Authentication Helpers
+export async function loginWithEmail(email: string, pass: string) {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    return result.user;
+  } catch (error) {
+    console.error("Auth login failure:", error);
+    throw error;
+  }
+}
+
+export async function registerWithEmail(email: string, pass: string) {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    return result.user;
+  } catch (error) {
+    console.error("Auth register failure:", error);
+    throw error;
+  }
+}
+
 export async function loginWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);

@@ -75,12 +75,28 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
 
   const totalComplaintsValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
 
+  // Dynamically calculate positive reviews sector counts
+  const positiveCountsMap: { [key: string]: number } = {};
+  filtered.forEach((occ) => {
+    if (occ.occurrenceType === "Feedback positivo") {
+      positiveCountsMap[occ.sector] = (positiveCountsMap[occ.sector] || 0) + 1;
+    }
+  });
+
+  const positiveChartData = Object.keys(positiveCountsMap).map((sec) => ({
+    name: sec,
+    value: positiveCountsMap[sec],
+    color: SECTOR_COLORS[sec] || SECTOR_COLORS[sec.charAt(0).toUpperCase() + sec.slice(1).toLowerCase()] || "#a8a29e"
+  })).sort((a, b) => b.value - a.value);
+
+  const totalPositiveValue = positiveChartData.reduce((acc, curr) => acc + curr.value, 0);
+
   // Custom label formatter to display Category Name, Count and Percentage directly on drawing canvas
-  const renderCustomizedLabel = (props: any) => {
+  const renderCustomizedLabel = (totalValue: number) => (props: any) => {
     const { cx, cy, midAngle, outerRadius, percent, name, value } = props;
     
     // Fallback calculation in case Recharts cannot compute percent or active sheet data has a rendering quirk
-    const calculatedPercent = totalComplaintsValue > 0 ? (value / totalComplaintsValue) : 0;
+    const calculatedPercent = totalValue > 0 ? (value / totalValue) : 0;
     const finalPercent = typeof percent === "number" && !isNaN(percent) ? percent : calculatedPercent;
     
     if (finalPercent < 0.01) return null; // Do not render label for 0% or trivial slices to prevent overlap
@@ -265,17 +281,23 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* Analytics and Data Grid */}
-      <div id="dashboard-analytics-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Analytics and Data Grid - COMPLAINTS */}
+      <div className="pt-4 border-t border-rose-100">
+        <h2 className="text-lg font-bold font-display text-neutral-800 flex items-center gap-2 mb-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+          <span>Gestão de Reclamações por Setor</span>
+        </h2>
+      </div>
+      <div id="dashboard-analytics-grid-complaints" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pie Chart Card */}
-        <div id="analytics-chart-card" className="bg-white rounded-2xl border border-luxury-200 p-5 lg:col-span-2 flex flex-col">
-          <h3 className="text-base font-semibold font-display text-neutral-800 flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-brass-500" />
+        <div id="analytics-chart-card-complaints" className="bg-white rounded-2xl border border-luxury-200 p-5 lg:col-span-2 flex flex-col">
+          <h3 className="text-sm font-semibold font-display text-neutral-800 uppercase tracking-wider flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-rose-500" />
             <span>Percentual de Reclamações por Setor</span>
           </h3>
 
           {totalComplaintsValue > 0 ? (
-            <div id="piechart-subcontainer" className="flex-1 min-h-[550px] flex items-center justify-center relative">
+            <div id="piechart-subcontainer-complaints" className="flex-1 min-h-[550px] flex items-center justify-center relative">
               <ResponsiveContainer width="100%" height={550}>
                 <PieChart margin={{ top: 25, right: 120, bottom: 25, left: 120 }}>
                   <Pie
@@ -286,7 +308,7 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
                     outerRadius={150}
                     paddingAngle={3}
                     dataKey="value"
-                    label={renderCustomizedLabel}
+                    label={renderCustomizedLabel(totalComplaintsValue)}
                     labelLine={false}
                   >
                     {chartData.map((entry, index) => (
@@ -317,13 +339,13 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
         </div>
 
         {/* Sector Rank Card */}
-        <div id="analytics-rank-card" className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
+        <div id="analytics-rank-card-complaints" className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
           <h3 className="text-sm font-bold font-display uppercase tracking-wider text-neutral-400 mb-4">
             Volume de Reclamações
           </h3>
 
           {totalComplaintsValue > 0 ? (
-            <div id="rank-sectors-list" className="space-y-4 flex-1 overflow-y-auto max-h-[300px] pr-1">
+            <div id="rank-sectors-list-complaints" className="space-y-4 flex-1 overflow-y-auto max-h-[500px] pr-1">
               {chartData.map((item, index) => {
                 const pct = Math.round((item.value / totalComplaintsValue) * 100);
                 return (
@@ -337,7 +359,107 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
                         <span>{item.value} ({pct}%)</span>
                       </div>
                     </div>
-                    {/* Progress Bar background matching screenshots */}
+                    {/* Progress Bar */}
+                    <div className="w-full bg-luxury-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-1000"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: item.color
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-400">
+              <span className="text-xs">Aguardando dados...</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Analytics and Data Grid - POSITIVE REVIEWS */}
+      <div className="pt-8 border-t border-emerald-100">
+        <h2 className="text-lg font-bold font-display text-neutral-800 flex items-center gap-2 mb-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Gestão de Feedbacks Positivos por Setor</span>
+        </h2>
+      </div>
+      <div id="dashboard-analytics-grid-positive" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pie Chart Card */}
+        <div id="analytics-chart-card-positive" className="bg-white rounded-2xl border border-luxury-200 p-5 lg:col-span-2 flex flex-col">
+          <h3 className="text-sm font-semibold font-display text-neutral-800 uppercase tracking-wider flex items-center gap-2 mb-4">
+            <ThumbsUp className="w-4 h-4 text-emerald-600" />
+            <span>Distribuição de Elogios por Setor</span>
+          </h3>
+
+          {totalPositiveValue > 0 ? (
+            <div id="piechart-subcontainer-positive" className="flex-1 min-h-[550px] flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height={550}>
+                <PieChart margin={{ top: 25, right: 120, bottom: 25, left: 120 }}>
+                  <Pie
+                    data={positiveChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={90}
+                    outerRadius={150}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={renderCustomizedLabel(totalPositiveValue)}
+                    labelLine={false}
+                  >
+                    {positiveChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "1px solid #e9e6dc" }}
+                    formatter={(value: any) => [`${value} feedback(s) positivo(s)`, "Volume"]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              
+              {/* Centered Total Multi-Badge */}
+              <div className="absolute flex flex-col items-center justify-center">
+                <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
+                <span className="text-3xl font-extrabold font-display text-neutral-800">{totalPositiveValue}</span>
+                <span className="text-xs font-mono text-emerald-600 font-semibold uppercase">Elogios</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] text-center text-neutral-400">
+              <ThumbsUp className="w-12 h-12 stroke-1 mb-2 text-neutral-300" />
+              <p className="text-sm font-medium">Nenhum feedback positivo registrado neste período.</p>
+              <p className="text-xs text-neutral-400 mt-1">Insira novas avaliações positivas ou altere as datas acima.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Sector Rank Card */}
+        <div id="analytics-rank-card-positive" className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
+          <h3 className="text-sm font-bold font-display uppercase tracking-wider text-neutral-400 mb-4">
+            Volume de Elogios
+          </h3>
+
+          {totalPositiveValue > 0 ? (
+            <div id="rank-sectors-list-positive" className="space-y-4 flex-1 overflow-y-auto max-h-[500px] pr-1">
+              {positiveChartData.map((item, index) => {
+                const pct = Math.round((item.value / totalPositiveValue) * 100);
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-neutral-700">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span>{item.name}</span>
+                      </div>
+                      <div className="font-mono">
+                        <span>{item.value} ({pct}%)</span>
+                      </div>
+                    </div>
+                    {/* Progress Bar */}
                     <div className="w-full bg-luxury-100 h-2 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-1000"
