@@ -338,12 +338,12 @@ export default function ReportGenerator({ occurrences }: ReportGeneratorProps) {
 
           {/* Excel layout style grid (Categorized Sector | Quantity | Qualitative Description) */}
           <div id="excel-styled-table" className="overflow-x-auto border border-luxury-800/20 rounded-xl">
-            <table className="w-full text-left border-collapse min-w-[650px] text-sm">
+            <table className="w-full text-left border-collapse min-w-[650px] print:min-w-0 print:table-fixed text-sm">
               <thead>
                 <tr className="bg-luxury-800 text-white text-xs font-bold tracking-wider font-display border-b border-luxury-900">
-                  <th className="py-3 px-4 w-40">RECLAMAÇÕES (SETOR)</th>
-                  <th className="py-3 px-4 text-center w-24">QUANTIDADE</th>
-                  <th className="py-3 px-5">DESCRIÇÃO QUALITATIVA (SÍNTESE INTELIGENTE)</th>
+                  <th className="py-3 px-4 w-40 print:w-[25%]">RECLAMAÇÕES (SETOR)</th>
+                  <th className="py-3 px-4 text-center w-24 print:w-[15%]">QUANTIDADE</th>
+                  <th className="py-3 px-5 print:w-[60%]">DESCRIÇÃO QUALITATIVA (SÍNTESE INTELIGENTE)</th>
                 </tr>
               </thead>
               <tbody>

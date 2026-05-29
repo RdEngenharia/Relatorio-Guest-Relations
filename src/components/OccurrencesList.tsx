@@ -262,15 +262,15 @@ export default function OccurrencesList({
           <div className="space-y-4">
             {/* Desktop Spreadsheet Tabular View (printed beautifully regardless of screen size) */}
             <div id="desktop-spreadsheet" className="hidden lg:block print:block overflow-x-auto border border-luxury-200 rounded-xl">
-              <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+              <table className="w-full text-left border-collapse text-xs min-w-[800px] print:min-w-0 print:table-fixed">
                 <thead>
                   <tr className="bg-luxury-100/80 border-b border-luxury-200 font-bold text-neutral-600 font-display">
-                    <th className="py-3 px-4 w-28">DATA</th>
-                    <th className="py-3 px-4 w-24">Nº RESERVA</th>
-                    <th className="py-3 px-4 w-20">APTO</th>
-                    <th className="py-3 px-4 w-36">TIPO DE OCORRÊNCIA</th>
-                    <th className="py-3 px-4 w-32">SETOR / RECLAMAÇÃO</th>
-                    <th className="py-3 px-4">OBSERVAÇÃO</th>
+                    <th className="py-3 px-4 w-28 print:w-[10%]">DATA</th>
+                    <th className="py-3 px-4 w-24 print:w-[12%]">Nº RESERVA</th>
+                    <th className="py-3 px-4 w-20 print:w-[10%]">APTO</th>
+                    <th className="py-3 px-4 w-36 print:w-[16%]">TIPO DE OCORRÊNCIA</th>
+                    <th className="py-3 px-4 w-32 print:w-[16%]">SETOR / RECLAMAÇÃO</th>
+                    <th className="py-3 px-4 print:w-[36%]">OBSERVAÇÃO</th>
                     <th className="py-3 px-4 text-right w-24 print:hidden">AÇÕES</th>
                   </tr>
                 </thead>

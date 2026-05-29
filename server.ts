@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 
 dotenv.config();
 
@@ -154,6 +153,7 @@ Forneça o resultado rigorosamente em formato JSON estruturado com a contagem ex
 // Setup Vite Dev server or production static serving
 async function configureServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -172,4 +172,8 @@ async function configureServer() {
   });
 }
 
-configureServer();
+if (!process.env.VERCEL) {
+  configureServer();
+}
+
+export default app;

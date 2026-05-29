@@ -70,15 +70,20 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
   const chartData = Object.keys(sectorCountsMap).map((sec) => ({
     name: sec,
     value: sectorCountsMap[sec],
-    color: SECTOR_COLORS[sec] || "#a8a29e"
+    color: SECTOR_COLORS[sec] || SECTOR_COLORS[sec.charAt(0).toUpperCase() + sec.slice(1).toLowerCase()] || "#a8a29e"
   })).sort((a, b) => b.value - a.value);
 
   const totalComplaintsValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
 
   // Custom label formatter to display Category Name, Count and Percentage directly on drawing canvas
   const renderCustomizedLabel = (props: any) => {
-    const { cx, cy, midAngle, outerRadius, percent, name, value, index } = props;
-    if (percent < 0.01) return null; // Do not render label for 0% or trivial slices to prevent overlap
+    const { cx, cy, midAngle, outerRadius, percent, name, value } = props;
+    
+    // Fallback calculation in case Recharts cannot compute percent or active sheet data has a rendering quirk
+    const calculatedPercent = totalComplaintsValue > 0 ? (value / totalComplaintsValue) : 0;
+    const finalPercent = typeof percent === "number" && !isNaN(percent) ? percent : calculatedPercent;
+    
+    if (finalPercent < 0.01) return null; // Do not render label for 0% or trivial slices to prevent overlap
     
     const RADIAN = Math.PI / 180;
     const sin = Math.sin(-RADIAN * midAngle);
@@ -87,13 +92,13 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
     // Starting coordinates near slice boundary, extension coordinate, text horizontal extension line
     const sx = cx + (outerRadius + 3) * cos;
     const sy = cy + (outerRadius + 3) * sin;
-    const mx = cx + (outerRadius + 18) * cos;
-    const my = cy + (outerRadius + 18) * sin;
-    const ex = mx + (cos >= 0 ? 1 : -1) * 20;
+    const mx = cx + (outerRadius + 24) * cos;
+    const my = cy + (outerRadius + 24) * sin;
+    const ex = mx + (cos >= 0 ? 1 : -1) * 25;
     const ey = my;
     
     const textAnchor = cos >= 0 ? "start" : "end";
-    const itemColor = chartData[index]?.color || props.fill || "#888";
+    const itemColor = SECTOR_COLORS[name] || SECTOR_COLORS[name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()] || props.fill || "#888";
 
     return (
       <g>
@@ -105,26 +110,26 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
           fill="none"
         />
         {/* Decorative end point indicator dot */}
-        <circle cx={ex} cy={ey} r={2.5} fill={itemColor} />
+        <circle cx={ex} cy={ey} r={3} fill={itemColor} />
         {/* Category Label text */}
         <text
-          x={ex + (cos >= 0 ? 5 : -5)}
-          y={ey - 3}
+          x={ex + (cos >= 0 ? 6 : -6)}
+          y={ey - 4}
           textAnchor={textAnchor}
           fill="#1f2937"
-          className="font-extrabold text-[11px] font-sans"
+          className="font-extrabold text-[12px] font-sans"
         >
           {name}
         </text>
         {/* Value and Percentage detail text */}
         <text
-          x={ex + (cos >= 0 ? 5 : -5)}
-          y={ey + 9}
+          x={ex + (cos >= 0 ? 6 : -6)}
+          y={ey + 10}
           textAnchor={textAnchor}
           fill="#4b5563"
-          className="font-mono text-[9px] font-semibold"
+          className="font-mono text-[10px] font-bold"
         >
-          {`${value} (${Math.round(percent * 100)}%)`}
+          {`${value} (${Math.round(finalPercent * 100)}%)`}
         </text>
       </g>
     );
@@ -270,15 +275,15 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
           </h3>
 
           {totalComplaintsValue > 0 ? (
-            <div id="piechart-subcontainer" className="flex-1 min-h-[340px] flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height={345}>
-                <PieChart margin={{ top: 25, right: 100, bottom: 25, left: 100 }}>
+            <div id="piechart-subcontainer" className="flex-1 min-h-[550px] flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height={550}>
+                <PieChart margin={{ top: 25, right: 120, bottom: 25, left: 120 }}>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
+                    innerRadius={90}
+                    outerRadius={150}
                     paddingAngle={3}
                     dataKey="value"
                     label={renderCustomizedLabel}
@@ -297,9 +302,9 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
               
               {/* Centered Total Multi-Badge */}
               <div className="absolute flex flex-col items-center justify-center">
-                <span className="text-xs text-neutral-400 uppercase font-mono tracking-wide">Total</span>
-                <span className="text-2xl font-extrabold font-display text-neutral-800">{totalComplaintsValue}</span>
-                <span className="text-[10px] font-mono text-rose-500 font-semibold uppercase">Queixas</span>
+                <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
+                <span className="text-3xl font-extrabold font-display text-neutral-800">{totalComplaintsValue}</span>
+                <span className="text-xs font-mono text-rose-500 font-semibold uppercase">Queixas</span>
               </div>
             </div>
           ) : (
