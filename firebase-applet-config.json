@@ -1,10 +1,10 @@
 {
-  "projectId": "usina-rd-solar",
-  "appId": "1:509541158775:web:0695c00045cf9837069b72",
-  "apiKey": "AIzaSyAIrmFfKlMNmTS8YR_cRPbnfY5hEzfqOuw",
-  "authDomain": "usina-rd-solar.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-7e23eec7-ea29-4dbe-a259-e4c33004e390",
-  "storageBucket": "usina-rd-solar.firebasestorage.app",
-  "messagingSenderId": "509541158775",
+  "projectId": "guest-relations-a079c",
+  "appId": "1:919980881089:web:c2a6b3c5611df6ad04d040",
+  "apiKey": "AIzaSyDvioW4_XAB5v3AenKAY8IrAslPn46yYl8",
+  "authDomain": "guest-relations-a079c.firebaseapp.com",
+  "databaseURL": "https://guest-relations-a079c-default-rtdb.firebaseio.com",
+  "storageBucket": "guest-relations-a079c.firebasestorage.app",
+  "messagingSenderId": "919980881089",
   "measurementId": ""
 }

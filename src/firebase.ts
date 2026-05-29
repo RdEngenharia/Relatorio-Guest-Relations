@@ -5,8 +5,12 @@ import firebaseConfig from "../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
 
-// CRITICAL: The app will break without specifying the custom firestoreDatabaseId
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const config: any = firebaseConfig;
+
+// CRITICAL: The app will break without specifying the custom firestoreDatabaseId (if it is defined)
+export const db = config.firestoreDatabaseId 
+  ? getFirestore(app, config.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
