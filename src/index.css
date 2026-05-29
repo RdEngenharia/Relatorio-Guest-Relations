@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-luxury-50: #fbfbf9;
+  --color-luxury-100: #f6f5f0;
+  --color-luxury-200: #e9e6dc;
+  --color-luxury-800: #1c1c1a;
+  --color-luxury-900: #141412;
+  --color-brass-500: #c5a059;
+  --color-brass-600: #b08d4b;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-luxury-50);
+  color: var(--color-luxury-900);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-luxury-100);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-luxury-200);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brass-500);
+}
+
+/* Premium clean print stylesheet configuration for direct window.print() reports */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #141412 !important;
+  }
+
+  /* Hide headers, navigation items, buttons, historical list feeds, date controls and page forms */
+  header,
+  nav,
+  aside,
+  input,
+  select,
+  button,
+  .print\:hidden,
+  #print-controls,
+  #report-history-block,
+  #app-navigation,
+  #app-header,
+  #sheets-tab-selector,
+  #list-sheets-tab-selector,
+  #search-filter-card,
+  #dashboard-date-filters {
+    display: none !important;
+  }
+
+  /* Reset outer container grids and spacings to render a full-bleed document */
+  main,
+  #app-main-content,
+  #report-generator-tab {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Dashboard printer layout overrides */
+  #dashboard-view-panel {
+    display: block !important;
+  }
+
+  #dashboard-kpis {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    margin-bottom: 24px !important;
+  }
+
+  #dashboard-kpis > div {
+    border: 1px solid #e9e6dc !important;
+    padding: 12px !important;
+    border-radius: 12px !important;
+    background-color: #fbfbf9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #dashboard-analytics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  #analytics-chart-card {
+    grid-column: span 2 / span 2 !important;
+    border: 1px solid #e9e6dc !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    page-break-inside: avoid !important;
+  }
+
+  #analytics-rank-card {
+    grid-column: span 1 / span 1 !important;
+    border: 1px solid #e9e6dc !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    page-break-inside: avoid !important;
+  }
+
+  #piechart-subcontainer {
+    width: 100% !important;
+    height: 350px !important;
+    display: block !important;
+  }
+
+  /* Stylize compiled report canvas to fit perfect A4 document formats */
+  #qualitative-report-canvas {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0px !important;
+    margin: 0px !important;
+    background: transparent !important;
+    display: block !important;
+  }
+
+  #excel-styled-table {
+    border: 1px solid #1c1c1a !important;
+    border-radius: 0px !important;
+    overflow: visible !important;
+  }
+
+  #excel-styled-table table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #excel-styled-table th {
+    background-color: #1c1c1a !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #excel-styled-table td {
+    border-bottom: 1px solid #e9e6dc !important;
+  }
+
+  /* Daily history occurrence table adjustments for premium paper documents */
+  #occurrences-list-block {
+    display: block !important;
+  }
+
+  #data-table-card {
+    border: none !important;
+    padding: 0px !important;
+    margin: 0px !important;
+    background: transparent !important;
+  }
+
+  #desktop-spreadsheet {
+    display: block !important;
+    border: 1px solid #1c1c1a !important;
+    border-radius: 0px !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  #desktop-spreadsheet table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #desktop-spreadsheet th {
+    background-color: #1c1c1a !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    border: 1px solid #1c1c1a !important;
+    padding: 8px 10px !important;
+  }
+
+  #desktop-spreadsheet td {
+    border: 1px solid #e9e6dc !important;
+    padding: 8px 10px !important;
+    background: transparent !important;
+    color: #141412 !important;
+  }
+}

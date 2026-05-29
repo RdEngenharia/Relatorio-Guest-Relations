@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Occurrences endpoint rules
+    match /occurrences/{occurrenceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == request.time;
+      allow update: if isSignedIn() && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time;
+      allow delete: if isSignedIn();
+    }
+
+    // Connection ping test endpoint
+    match /test/{documentId} {
+      allow read: if true;
+    }
+
+    // Compiled reports endpoint rules
+    match /reports/{reportId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(reportId) && isValidReport(request.resource.data) && request.resource.data.createdAt == request.time;
+      allow update: if isSignedIn() && isValidId(reportId) && isValidReport(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isSignedIn();
+    }
+
+    // Specific entity validation checking keys, structures, types and bounds
+    function isValidOccurrence(occ) {
+      return occ.keys().hasAll(['date', 'bookingNumber', 'apartment', 'occurrenceType', 'sector', 'observation', 'createdAt', 'updatedAt'])
+        && (occ.keys().size() == 8 || (occ.keys().size() == 9 && occ.keys().hasAll(['source']) && occ.source is string && (occ.source == 'resort' || occ.source == 'google')))
+        && occ.date is string && occ.date.size() <= 32
+        && occ.bookingNumber is string && occ.bookingNumber.size() <= 32
+        && occ.apartment is string && occ.apartment.size() <= 32
+        && occ.occurrenceType is string && occ.occurrenceType.size() <= 128
+        && occ.sector is string && occ.sector.size() <= 128
+        && occ.observation is string && occ.observation.size() <= 5000;
+    }
+
+    function isValidReport(rep) {
+      return rep.keys().hasAll(['title', 'startDate', 'endDate', 'sectorSummaries', 'createdAt'])
+        && rep.keys().size() == 5
+        && rep.title is string && rep.title.size() <= 200
+        && rep.startDate is string && rep.startDate.size() <= 32
+        && rep.endDate is string && rep.endDate.size() <= 32
+        && rep.sectorSummaries is string && rep.sectorSummaries.size() <= 65536;
+    }
+  }
+}

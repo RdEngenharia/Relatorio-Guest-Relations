@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "Occurrence": {
+      "title": "Occurrence",
+      "description": "Represents a guest occurrence daily log entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the occurrence log." },
+        "date": { "type": "string", "format": "date", "description": "The occurrence date (YYYY-MM-DD)." },
+        "bookingNumber": { "type": "string", "description": "The reservation or booking number." },
+        "apartment": { "type": "string", "description": "The apartment/room number." },
+        "occurrenceType": { "type": "string", "description": "The type of incident (e.g., Reclamação, Feedback positivo)." },
+        "sector": { "type": "string", "description": "The sector associated with this incident (e.g., AeB, Estrutura, TI, Lazer)." },
+        "observation": { "type": "string", "description": "Detailed text of what happened." },
+        "source": { "type": "string", "enum": ["resort", "google"], "description": "The origin channel of the occurrence. Defaults to resort." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp if stored." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server modification timestamp if stored." }
+      },
+      "required": ["date", "bookingNumber", "apartment", "occurrenceType", "sector", "observation"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A saved historical summary report of occurred incidents over a specified date range.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the report." },
+        "title": { "type": "string", "description": "Name of the report (e.g., Relatório de Ocorrências Abril)." },
+        "startDate": { "type": "string", "format": "date", "description": "The start bounds of this report." },
+        "endDate": { "type": "string", "format": "date", "description": "The end bounds of this report." },
+        "sectorSummaries": {
+          "type": "string",
+          "description": "JSON string or serialized structure containing sector key, amount, and the qualitative summary text."
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." }
+      },
+      "required": ["title", "startDate", "endDate", "sectorSummaries"]
+    }
+  },
+  "firestore": {
+    "/occurrences/{occurrenceId}": {
+      "schema": "Occurrence",
+      "description": "Flat collection representing daily logged incidents."
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Saved summary reports generated across specific ranges."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Relatório de Ocorrências",
+  "description": "Aplicativo para registro de ocorrências diárias e relatórios automáticos inteligentes com IA para o setor de Guest Relations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
