@@ -322,8 +322,8 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
                 </PieChart>
               </ResponsiveContainer>
               
-              {/* Centered Total Multi-Badge */}
-              <div className="absolute flex flex-col items-center justify-center">
+              {/* Centered Total Multi-Badge — verdadeiramente centralizado no contêiner */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
                 <span className="text-3xl font-extrabold font-display text-neutral-800">{totalComplaintsValue}</span>
                 <span className="text-xs font-mono text-rose-500 font-semibold uppercase">Queixas</span>
@@ -422,8 +422,8 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
                 </PieChart>
               </ResponsiveContainer>
               
-              {/* Centered Total Multi-Badge */}
-              <div className="absolute flex flex-col items-center justify-center">
+              {/* Centered Total Multi-Badge — verdadeiramente centralizado no contêiner */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
                 <span className="text-3xl font-extrabold font-display text-neutral-800">{totalPositiveValue}</span>
                 <span className="text-xs font-mono text-emerald-600 font-semibold uppercase">Elogios</span>
