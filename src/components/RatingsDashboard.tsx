@@ -16,10 +16,8 @@ interface RatingsDashboardProps {
 
 const normalizeScore = (v: number | null | undefined): number | null => {
   if (v === null || v === undefined) return null;
-  if (v <= 5) return v;
-  if (v <= 10) return Math.round((v / 10) * 5);
-  if (v <= 100) return Math.round((v / 100) * 5);
-  return null;
+  if (v >= 1 && v <= 5) return v;
+  return null; // valores fora de 1-5 são dados inválidos — ignorar
 };
 
 export default function RatingsDashboard({ occurrences, onClearData }: RatingsDashboardProps) {
