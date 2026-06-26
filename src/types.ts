@@ -6,7 +6,13 @@ export interface Occurrence {
   occurrenceType: string; // "Reclamação" | "Feedback positivo" | "Outro"
   sector: string; // "AeB" | "Estrutura" | "TI" | "Lazer" | "Manutenção" | "Governança" | "Recepção" | "All inclusive" | "Wifi" | "Programações" | "Outro"
   observation: string;
-  source?: "resort" | "google";
+  source?: "resort" | "google" | "flexspot";
+  ratings?: {
+    wifi?: number | null;
+    alimentacao?: number | null;
+    atendimento?: number | null;
+    limpeza?: number | null;
+  };
   createdAt: any; // ServerTimestamp
   updatedAt: any; // ServerTimestamp
 }

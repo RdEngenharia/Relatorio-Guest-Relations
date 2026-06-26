@@ -1,12 +1,24 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
+import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Read Firebase config safely from file system
+const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(firebaseApp);
 
 // Initialize Google GenAI on the server with User-Agent required header
 const apiKey = process.env.GEMINI_API_KEY;
@@ -147,6 +159,94 @@ Forneça o resultado rigorosamente em formato JSON estruturado com a contagem ex
   } catch (error) {
     console.error("Erro ao resumir período:", error);
     res.status(500).json({ error: "Não foi possível gerar a síntese com Inteligência Artificial." });
+  }
+});
+
+// Endpoint to parse copy-pasted text/data from Flexspot surveys list using Gemini AI
+app.post("/api/parse-pasted-text", async (req, res) => {
+  try {
+    const { rawText } = req.body;
+    if (!rawText || typeof rawText !== "string") {
+      return res.status(400).json({ error: "O texto bruto está vazio ou é inválido." });
+    }
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "Chave do Gemini API não configurada no servidor." });
+    }
+
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const prompt = `Você é um robô auxiliar de recepção hoteleira focado em extrair dados do sistema Flexspot.
+Abaixo está um bloco de texto bruto que o usuário copiou diretamente da tela de listagem de feedbacks/cadastros/surveys ou de uma exportação de dados do portal Flexspot.
+Esse texto pode conter várias avaliações misturadas com nomes de clientes, e-mails, notas, comentários ou cabeçalhos.
+
+TEXTO BRUTO COPIADO DO FLEXSPOT:
+"""
+${rawText}
+"""
+
+Analise cuidadosamente este texto. Sua missão é identificar todas as avaliações e comentários de hóspedes contidos nele e extrair uma lista estruturada de avaliações.
+
+ATENÇÃO CRÍTICA PARA FORMATOS DE EXPORTAÇÃO TABULARES (TABULAÇÕES/PLANILHA COPIADA):
+O texto pode vir no formato de planilha com colunas separadas por tabulações (TSV) ou espaços, contendo linhas como:
+"apartamento	data de resposta	email	nome da pesquisa	pergunta	resposta	usuário"
+Neste formato tabular, cada resposta a uma pergunta individual gera uma linha diferente. Portanto, um mesmo hóspede (mesmo apartamento, mesma data/hora aproximada de resposta, e mesmo nome do usuário/hóspede) terá VÁRIAS LINHAS no texto bruto.
+Você DEVE OBRIGATORIAMENTE AGRUPAR todas as linhas pertencentes à mesma sessão de resposta do hóspede em uma única avaliação consolidada!
+
+Regras de Consolidação e Processamento:
+1. Agrupamento: Identifique as linhas que possuem o mesmo "apartamento", "usuário" e "data de resposta" (ou data de resposta no mesmo dia e minuto) e agrupe-as em um único objeto de avaliação.
+2. Mapeamento de Notas (Ratings):
+   - Perguntas contendo "internet/wifi", "wi-fi", "wifi", "conexão" -> mapear o número correspondente da resposta para "ratings.wifi".
+   - Perguntas contendo "alimentação", "alimentos", "bebidas", "comida", "restaurante" -> mapear o número correspondente da resposta para "ratings.alimentacao".
+   - Perguntas contendo "recepção", "atendimento geral", "serviço", "equipe" -> mapear o número correspondente da resposta para "ratings.atendimento".
+   - Perguntas contendo "limpeza do apartamento", "limpeza de quarto", "conservação e limpeza" -> mapear o número correspondente da resposta para "ratings.limpeza".
+3. ESCALA DE NOTAS (Conversão de 1 a 5 para 1 a 10):
+   Se as notas originais do sistema Flexspot estiverem na escala de 1 a 5 (por exemplo: "5", "4", "3", "2", "1"), converta-as obrigatoriamente para a escala de 1 a 10 multiplicando-as por 2 (ex: nota 5 vira 10, nota 4 vira 8, nota 3 vira 6, nota 2 vira 4, nota 1 vira 2). Se a nota já estiver em escala de 1 a 10, mantenha o valor original.
+4. "observation" (Comentário do Hóspede):
+   - Se houver uma linha de pergunta do tipo "Comentários gerais" ou "Comentários adicionais", utilize o texto da resposta como a observação principal.
+   - Se não houver nenhum comentário de texto, gere uma observação sumarizada elegante em português com base nas notas consolidadas, por exemplo: "Pesquisa respondida pelo hóspede (Notas gerais excelentes)." ou "Avaliação regular com pontos de atenção coletados."
+5. "occurrenceType": Classifique estritamente como "Reclamação" se houver alguma nota de setor consolidada que seja menor que 6/10 (ou menor que 3/5 na escala original) ou se a observação contiver reclamações explícitas. Caso contrário, use "Feedback positivo".
+6. "sector": Escolha o setor principal com base na menor nota ou principal reclamação: "AeB", "Estrutura", "TI", "Lazer", "Manutenção", "Governança", "Recepção", "All inclusive", "Wifi" ou "Outro".
+7. "date": A data da avaliação formatada em "YYYY-MM-DD". Se o formato na planilha for "DD/MM/YY HH:MM" (ex: "26/06/26 09:38"), converta para "2026-06-26". Se não houver data, use "${today}".
+
+Retorne rigorosamente um array JSON contendo esses objetos estruturados em conformidade com o esquema fornecido.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              date: { type: Type.STRING },
+              bookingNumber: { type: Type.STRING },
+              apartment: { type: Type.STRING },
+              occurrenceType: { type: Type.STRING },
+              sector: { type: Type.STRING },
+              observation: { type: Type.STRING },
+              ratings: {
+                type: Type.OBJECT,
+                properties: {
+                  wifi: { type: Type.INTEGER },
+                  alimentacao: { type: Type.INTEGER },
+                  atendimento: { type: Type.INTEGER },
+                  limpeza: { type: Type.INTEGER }
+                }
+              }
+            },
+            required: ["date", "bookingNumber", "apartment", "occurrenceType", "sector", "observation"]
+          }
+        }
+      }
+    });
+
+    const parsedJson = JSON.parse(response.text || "[]");
+    res.json({ success: true, items: parsedJson });
+  } catch (error: any) {
+    console.error("Erro ao analisar texto colado do Flexspot:", error);
+    res.status(500).json({ error: error.message || "Erro desconhecido ao processar o texto com Gemini AI." });
   }
 });
 

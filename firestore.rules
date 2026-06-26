@@ -19,7 +19,8 @@ service cloud.firestore {
     // Occurrences endpoint rules
     match /occurrences/{occurrenceId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == request.time;
+      allow create: if (isSignedIn() && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == request.time)
+                    || (request.resource.data.keys().hasAll(['source']) && request.resource.data.source == "flexspot" && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == request.time);
       allow update: if isSignedIn() && isValidId(occurrenceId) && isValidOccurrence(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time;
       allow delete: if isSignedIn();
     }
@@ -40,7 +41,9 @@ service cloud.firestore {
     // Specific entity validation checking keys, structures, types and bounds
     function isValidOccurrence(occ) {
       return occ.keys().hasAll(['date', 'bookingNumber', 'apartment', 'occurrenceType', 'sector', 'observation', 'createdAt', 'updatedAt'])
-        && (occ.keys().size() == 8 || (occ.keys().size() == 9 && occ.keys().hasAll(['source']) && occ.source is string && (occ.source == 'resort' || occ.source == 'google')))
+        && (occ.keys().size() >= 8 && occ.keys().size() <= 11)
+        && (!occ.keys().hasAll(['source']) || occ.source == null || (occ.source is string && (occ.source == 'resort' || occ.source == 'google' || occ.source == 'flexspot')))
+        && (!occ.keys().hasAll(['ratings']) || occ.ratings == null || occ.ratings is map)
         && occ.date is string && occ.date.size() <= 32
         && occ.bookingNumber is string && occ.bookingNumber.size() <= 32
         && occ.apartment is string && occ.apartment.size() <= 32

@@ -231,4 +231,77 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 11px !important;
     line-height: 1.4 !important;
   }
+
+  /* Flexspot Satisfação Dashboard Print Rules */
+  #flexspot-ratings-dashboard {
+    display: block !important;
+    background: #ffffff !important;
+  }
+
+  /* Grid for KPIs: render in 5 columns on portrait A4 */
+  #flexspot-ratings-dashboard .grid-cols-2 {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin-bottom: 20px !important;
+  }
+
+  #flexspot-ratings-dashboard .grid-cols-2 > div {
+    border: 1px solid #e9e6dc !important;
+    padding: 10px !important;
+    border-radius: 12px !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force chart area layout to have side by side charts */
+  #flexspot-ratings-dashboard .lg\:grid-cols-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    margin-bottom: 24px !important;
+  }
+
+  #flexspot-ratings-dashboard .lg\:grid-cols-2 > div {
+    border: 1px solid #e9e6dc !important;
+    padding: 14px !important;
+    border-radius: 16px !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent chart collapsing inside ResponsiveContainer under print media */
+  #flexspot-ratings-dashboard .h-72 {
+    height: 250px !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .recharts-responsive-container {
+    min-width: 200px !important;
+    min-height: 220px !important;
+    width: 100% !important;
+    height: 220px !important;
+  }
+
+  /* Colors and SVGs force adjustments inside printed documents */
+  .recharts-bar-rect, .recharts-line, .recharts-legend-item, .recharts-cartesian-grid-horizontal line {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Feed of qualitative reviews list */
+  #flexspot-ratings-dashboard .space-y-4 > div {
+    border: 1px solid #e9e6dc !important;
+    background-color: #fbfbf9 !important;
+    padding: 12px !important;
+    border-radius: 12px !important;
+    page-break-inside: avoid !important;
+    print-color-adjust: exact !important;
+  }
 }

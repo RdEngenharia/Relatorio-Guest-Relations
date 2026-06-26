@@ -12,7 +12,17 @@
         "occurrenceType": { "type": "string", "description": "The type of incident (e.g., Reclamação, Feedback positivo)." },
         "sector": { "type": "string", "description": "The sector associated with this incident (e.g., AeB, Estrutura, TI, Lazer)." },
         "observation": { "type": "string", "description": "Detailed text of what happened." },
-        "source": { "type": "string", "enum": ["resort", "google"], "description": "The origin channel of the occurrence. Defaults to resort." },
+        "source": { "type": "string", "enum": ["resort", "google", "flexspot"], "description": "The origin channel of the occurrence. Defaults to resort." },
+        "ratings": {
+          "type": "object",
+          "properties": {
+            "wifi": { "type": "integer" },
+            "alimentacao": { "type": "integer" },
+            "atendimento": { "type": "integer" },
+            "limpeza": { "type": "integer" }
+          },
+          "description": "Ratings from 1 to 10 for key sectors parsed from Flexspot feedback."
+        },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp if stored." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server modification timestamp if stored." }
       },
