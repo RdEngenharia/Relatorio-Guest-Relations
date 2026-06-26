@@ -328,9 +328,11 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
         if (!apartment && !question) continue;
 
-        // Group by apartment + userName + date portion (ignoring hours if we just want a single day consolidation,
-        // or using the full string to match the precise survey instance)
-        const key = `${apartment.toLowerCase()}|||${userName.toLowerCase()}|||${dateStr.toLowerCase()}`;
+        // Group by apartment + userName + date + hour to keep questions from the same survey session together
+        // (questions within one survey are answered across different minutes but same hour),
+        // while still separating two different surveys filled on the same day at different hours.
+        const dateHourKey = dateStr.trim().split(":")[0]; // e.g. "26/06/26 10" from "26/06/26 10:26"
+        const key = `${apartment.toLowerCase()}|||${userName.toLowerCase()}|||${dateHourKey.toLowerCase()}`;
         if (!groups[key]) {
           groups[key] = [];
         }
