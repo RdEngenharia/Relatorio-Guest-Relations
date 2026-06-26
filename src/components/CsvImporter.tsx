@@ -153,17 +153,21 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
         if (!apartment && !question) continue;
 
-        // Group by apartment + userName + date + hour to keep questions from the same survey session together
-        // (questions within one survey are answered across different minutes but same hour),
-        // while still separating two different surveys filled on the same day at different hours.
-        const dateHourKey = dateStr.trim().split(":")[0]; // e.g. "26/06/26 10" from "26/06/26 10:26"
-        const key = `${apartment.toLowerCase()}|||${userName.toLowerCase()}|||${dateHourKey.toLowerCase()}`;
+        // Agrupamos por apartamento + nome do hóspede + DIA (sem hora), porque o mesmo
+        // hóspede pode responder a pesquisa mais de uma vez no mesmo dia (em sessões com
+        // horários diferentes). Cada sessão é identificada internamente por dateHourKey e,
+        // se houver mais de uma sessão no mesmo dia, suas notas serão consolidadas por média
+        // (ver lógica de consolidação abaixo).
+        const dateDayKey = dateStr.trim().split(" ")[0]; // e.g. "26/06/26" de "26/06/26 10:26"
+        const dateHourKey = dateStr.trim().split(":")[0]; // e.g. "26/06/26 10" de "26/06/26 10:26" — identifica a sessão
+        const key = `${apartment.toLowerCase()}|||${userName.toLowerCase()}|||${dateDayKey.toLowerCase()}`;
         if (!groups[key]) {
           groups[key] = [];
         }
         groups[key].push({
           apartment,
           dateStr,
+          dateHourKey,
           email,
           surveyName,
           question,
@@ -245,41 +249,77 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
         const groupRows = groups[key];
         if (groupRows.length === 0) return;
 
+        // Separa as linhas do grupo (mesmo hóspede + mesmo dia) em sub-sessões,
+        // identificadas pela hora aproximada de resposta (dateHourKey). Isso é necessário
+        // porque um hóspede pode ter respondido a pesquisa MAIS DE UMA VEZ no mesmo dia
+        // (em horários diferentes) — nesse caso, cada resposta é uma sessão distinta, e as
+        // notas de cada sessão serão consolidadas por MÉDIA entre as sessões existentes.
+        const sessionsMap: { [hourKey: string]: any[] } = {};
+        groupRows.forEach(r => {
+          const hKey = r.dateHourKey || "default";
+          if (!sessionsMap[hKey]) sessionsMap[hKey] = [];
+          sessionsMap[hKey].push(r);
+        });
+        const sessions = Object.values(sessionsMap);
+
         const firstRow = groupRows[0];
 
-        // Pontuações (1-5) — separadas das informações gerais
-        const ratings: NonNullable<Partial<Occurrence>["ratings"]> = {};
-        // Informações gerais/qualitativas — nunca entram em médias
+        // Para cada sessão, extrai suas próprias notas/informações gerais isoladamente.
+        const perSessionRatings: NonNullable<Partial<Occurrence>["ratings"]>[] = [];
         let primeiraVez: string | undefined = undefined;
         let commentText = "";
 
-        groupRows.forEach(r => {
-          const qClean = cleanHeader(r.question);
-          const ans = r.answer;
+        sessions.forEach(sessionRows => {
+          const sessionRatings: NonNullable<Partial<Occurrence>["ratings"]> = {};
 
-          // 1) Tenta casar com uma das 13 perguntas de pontuação
-          const matcher = RATING_MATCHERS.find(m => m.test(qClean));
-          if (matcher) {
-            const score = parseRatingValue(ans);
-            if (score !== undefined) {
-              ratings[matcher.key] = score;
+          sessionRows.forEach((r: any) => {
+            const qClean = cleanHeader(r.question);
+            const ans = r.answer;
+
+            // 1) Tenta casar com uma das 13 perguntas de pontuação
+            const matcher = RATING_MATCHERS.find(m => m.test(qClean));
+            if (matcher) {
+              const score = parseRatingValue(ans);
+              if (score !== undefined) {
+                sessionRatings[matcher.key] = score;
+              }
+              return; // pergunta de nota não é também comentário/geral
             }
-            return; // pergunta de nota não é também comentário/geral
-          }
 
-          // 2) Pergunta "É sua primeira vez hospedado conosco?" — Sim/Não, não é nota
-          if (isPrimeiraVezQuestion(qClean)) {
-            if (ans && ans.trim()) primeiraVez = ans.trim();
-            return;
-          }
-
-          // 3) "Comentários gerais" e variações — texto livre, não é nota
-          if (isComentariosQuestion(qClean)) {
-            const ansClean = cleanHeader(ans || "");
-            if (ans && ans.trim() && !EMPTY_COMMENT_VALUES.has(ansClean)) {
-              commentText = ans.trim();
+            // 2) Pergunta "É sua primeira vez hospedado conosco?" — Sim/Não, não é nota
+            if (isPrimeiraVezQuestion(qClean)) {
+              if (ans && ans.trim()) primeiraVez = ans.trim();
+              return;
             }
-          }
+
+            // 3) "Comentários gerais" e variações — texto livre, não é nota.
+            // Quando há múltiplas sessões, mantemos o comentário mais recente não vazio.
+            if (isComentariosQuestion(qClean)) {
+              const ansClean = cleanHeader(ans || "");
+              if (ans && ans.trim() && !EMPTY_COMMENT_VALUES.has(ansClean)) {
+                commentText = ans.trim();
+              }
+            }
+          });
+
+          perSessionRatings.push(sessionRatings);
+        });
+
+        // Consolida as notas: se só há 1 sessão, usa os valores diretamente.
+        // Se há múltiplas sessões, calcula a MÉDIA de cada categoria entre as sessões
+        // que responderam aquela categoria (arredondada para o inteiro mais próximo,
+        // já que a escala de notas é 1-5).
+        const ratings: NonNullable<Partial<Occurrence>["ratings"]> = {};
+        const allRatingKeys = new Set<string>();
+        perSessionRatings.forEach(sr => Object.keys(sr).forEach(k => allRatingKeys.add(k)));
+
+        allRatingKeys.forEach(k => {
+          const values = perSessionRatings
+            .map(sr => (sr as any)[k])
+            .filter((v): v is number => v !== undefined && v !== null);
+          if (values.length === 0) return;
+          const avg = values.reduce((a, b) => a + b, 0) / values.length;
+          (ratings as any)[k] = Math.round(avg);
         });
 
         const finalDate = parseFlexspotDate(firstRow.dateStr);
@@ -288,6 +328,9 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
         if (!commentText) {
           commentText = `Pesquisa de satisfação preenchida por ${userName} (Quarto ${apartment}).`;
+        }
+        if (sessions.length > 1) {
+          commentText += ` (Média consolidada de ${sessions.length} respostas enviadas no mesmo dia.)`;
         }
 
         // Determine setor de maior atenção (menor nota entre as categorias com pior cobertura de setor)
