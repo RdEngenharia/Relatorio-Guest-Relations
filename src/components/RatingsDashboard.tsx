@@ -38,12 +38,9 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
   };
   // Filter for occurrences that have rating information (source is "flexspot" or has occurrences with ratings object)
   const flexspotOccurrences = useMemo(() => {
-    return occurrences.filter((occ) => occ.ratings && (
-      occ.ratings.wifi !== null ||
-      occ.ratings.alimentacao !== null ||
-      occ.ratings.atendimento !== null ||
-      occ.ratings.limpeza !== null
-    ));
+    return occurrences.filter((occ) =>
+      occ.ratings && Object.values(occ.ratings).some((v) => v !== null && v !== undefined)
+    );
   }, [occurrences]);
 
   // Date filters
@@ -68,64 +65,68 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
     });
   }, [flexspotOccurrences, startDate, endDate]);
 
-  // Calculations for KPI Cards
+  // Definição das 13 categorias de pontuação exibidas no dashboard, com metadados visuais.
+  const RATING_CATEGORIES: { key: keyof NonNullable<Occurrence["ratings"]>; label: string; color: string; icon: any }[] = [
+    { key: "satisfacaoGeral", label: "Satisfação Geral", color: "#9333ea", icon: Star },
+    { key: "atendimentoGeral", label: "Atendimento Geral", color: "#d97706", icon: UserCheck },
+    { key: "recepcao", label: "Recepção", color: "#ea580c", icon: UserCheck },
+    { key: "wifi", label: "Wi-Fi / Conexão", color: "#4338ca", icon: Wifi },
+    { key: "alimentacao", label: "Alimentação", color: "#1c3d5a", icon: Utensils },
+    { key: "bebidas", label: "Bebidas", color: "#0369a1", icon: Utensils },
+    { key: "boutique", label: "Boutique", color: "#be185d", icon: Sparkles },
+    { key: "areasSociais", label: "Áreas Sociais (Limpeza)", color: "#0891b2", icon: Sparkles },
+    { key: "limpezaApartamento", label: "Limpeza do Apto", color: "#0e7490", icon: Sparkles },
+    { key: "estruturaApartamento", label: "Estrutura do Apto", color: "#65a30d", icon: Sparkles },
+    { key: "equipeLazer", label: "Equipe de Lazer", color: "#ca8a04", icon: Sparkles },
+    { key: "estruturaLazer", label: "Estrutura de Lazer", color: "#16a34a", icon: Sparkles },
+    { key: "parqueAventuras", label: "Parque de Aventuras", color: "#059669", icon: Sparkles }
+  ];
+
+  // Calculations for KPI Cards — agora cobrindo as 13 categorias reais do CSV, calculadas dinamicamente
   const stats = useMemo(() => {
-    let wifiSum = 0, wifiCount = 0;
-    let foodSum = 0, foodCount = 0;
-    let serviceSum = 0, serviceCount = 0;
-    let cleanSum = 0, cleanCount = 0;
+    const sums: Record<string, number> = {};
+    const counts: Record<string, number> = {};
+    RATING_CATEGORIES.forEach(c => { sums[c.key] = 0; counts[c.key] = 0; });
 
     filteredOccurrences.forEach((occ) => {
       const r = occ.ratings;
       if (!r) return;
-      const w = normalizeScore(r.wifi);
-      const f = normalizeScore(r.alimentacao);
-      const s = normalizeScore(r.atendimento);
-      const c = normalizeScore(r.limpeza);
-      if (w !== null) { wifiSum += w; wifiCount++; }
-      if (f !== null) { foodSum += f; foodCount++; }
-      if (s !== null) { serviceSum += s; serviceCount++; }
-      if (c !== null) { cleanSum += c; cleanCount++; }
+      RATING_CATEGORIES.forEach(c => {
+        const score = normalizeScore((r as any)[c.key]);
+        if (score !== null) {
+          sums[c.key] += score;
+          counts[c.key] += 1;
+        }
+      });
     });
 
     const capAvg = (val: number) => Math.min(5, Number(val.toFixed(1)));
-    const wifiAvg = wifiCount > 0 ? capAvg(wifiSum / wifiCount) : null;
-    const foodAvg = foodCount > 0 ? capAvg(foodSum / foodCount) : null;
-    const serviceAvg = serviceCount > 0 ? capAvg(serviceSum / serviceCount) : null;
-    const cleanAvg = cleanCount > 0 ? capAvg(cleanSum / cleanCount) : null;
+    const averages: Record<string, number | null> = {};
+    RATING_CATEGORIES.forEach(c => {
+      averages[c.key] = counts[c.key] > 0 ? capAvg(sums[c.key] / counts[c.key]) : null;
+    });
 
-    // Overall Average
-    let overallSum = 0;
-    let overallCount = 0;
-    if (wifiAvg !== null) { overallSum += wifiAvg; overallCount++; }
-    if (foodAvg !== null) { overallSum += foodAvg; overallCount++; }
-    if (serviceAvg !== null) { overallSum += serviceAvg; overallCount++; }
-    if (cleanAvg !== null) { overallSum += cleanAvg; overallCount++; }
-
-    const overallAvg = overallCount > 0 ? Number((overallSum / overallCount).toFixed(1)) : null;
+    // Overall Average — média das médias de todas as categorias com pelo menos 1 resposta
+    const validAverages = RATING_CATEGORIES
+      .map(c => averages[c.key])
+      .filter((v): v is number => v !== null);
+    const overallAvg = validAverages.length > 0
+      ? Number((validAverages.reduce((a, b) => a + b, 0) / validAverages.length).toFixed(1))
+      : null;
 
     return {
-      wifiAvg,
-      wifiCount,
-      foodAvg,
-      foodCount,
-      serviceAvg,
-      serviceCount,
-      cleanAvg,
-      cleanCount,
+      averages,
+      counts,
       overallAvg,
       totalResponses: filteredOccurrences.length
     };
   }, [filteredOccurrences]);
 
-  // Chart Data: Pie Chart representing volume of reviews per sector, just like the dashboard
+  // Chart Data: Pie Chart representing volume of reviews per category, just like the dashboard
   const sectorPieData = useMemo(() => {
-    return [
-      { name: "Wi-Fi Conexão", value: stats.wifiCount, avg: stats.wifiAvg, color: "#4338ca" },
-      { name: "Alimentos & Bebidas", value: stats.foodCount, avg: stats.foodAvg, color: "#1c3d5a" },
-      { name: "Atendimento Recepção", value: stats.serviceCount, avg: stats.serviceAvg, color: "#d97706" },
-      { name: "Governança Limpeza", value: stats.cleanCount, avg: stats.cleanAvg, color: "#0891b2" }
-    ].filter(item => item.value > 0);
+    return RATING_CATEGORIES
+      .map(c => ({ name: c.label, value: stats.counts[c.key] || 0, avg: stats.averages[c.key], color: c.color }))
+      .filter(item => item.value > 0);
   }, [stats]);
 
   // Helper to determine badge background for ratings (1-5 scale)
@@ -328,101 +329,38 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               </p>
             </div>
 
-            {/* Wi-Fi Conexão */}
-            <div className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">Wi-Fi Conexão</span>
-                <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-xl"><Wifi className="w-4 h-4" /></span>
-              </div>
-              <div className="my-3">
-                <span className="text-3xl font-extrabold font-mono text-neutral-800">
-                  {stats.wifiAvg !== null ? stats.wifiAvg : "—"}
-                </span>
-                {stats.wifiAvg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                <span>{stats.wifiCount} respostas</span>
-                {stats.wifiAvg && (
-                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                    stats.wifiAvg >= 4 ? "bg-emerald-50 text-emerald-600" : stats.wifiAvg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-                  }`}>
-                    {stats.wifiAvg >= 4 ? "Excelente" : stats.wifiAvg >= 2.5 ? "Regular" : "Crítico"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Alimentos e Bebidas */}
-            <div className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">Alimentos & Bebidas</span>
-                <span className="p-1.5 bg-neutral-100 text-neutral-700 rounded-xl"><Utensils className="w-4 h-4" /></span>
-              </div>
-              <div className="my-3">
-                <span className="text-3xl font-extrabold font-mono text-neutral-800">
-                  {stats.foodAvg !== null ? stats.foodAvg : "—"}
-                </span>
-                {stats.foodAvg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                <span>{stats.foodCount} respostas</span>
-                {stats.foodAvg && (
-                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                    stats.foodAvg >= 4 ? "bg-emerald-50 text-emerald-600" : stats.foodAvg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-                  }`}>
-                    {stats.foodAvg >= 4 ? "Excelente" : stats.foodAvg >= 2.5 ? "Regular" : "Crítico"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Atendimento */}
-            <div className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">Recepção / Serviço</span>
-                <span className="p-1.5 bg-amber-50 text-amber-600 rounded-xl"><UserCheck className="w-4 h-4" /></span>
-              </div>
-              <div className="my-3">
-                <span className="text-3xl font-extrabold font-mono text-neutral-800">
-                  {stats.serviceAvg !== null ? stats.serviceAvg : "—"}
-                </span>
-                {stats.serviceAvg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                <span>{stats.serviceCount} respostas</span>
-                {stats.serviceAvg && (
-                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                    stats.serviceAvg >= 4 ? "bg-emerald-50 text-emerald-600" : stats.serviceAvg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-                  }`}>
-                    {stats.serviceAvg >= 4 ? "Excelente" : stats.serviceAvg >= 2.5 ? "Regular" : "Crítico"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Limpeza */}
-            <div className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">Limpeza / Quarto</span>
-                <span className="p-1.5 bg-cyan-50 text-cyan-600 rounded-xl"><Sparkles className="w-4 h-4" /></span>
-              </div>
-              <div className="my-3">
-                <span className="text-3xl font-extrabold font-mono text-neutral-800">
-                  {stats.cleanAvg !== null ? stats.cleanAvg : "—"}
-                </span>
-                {stats.cleanAvg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                <span>{stats.cleanCount} respostas</span>
-                {stats.cleanAvg && (
-                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                    stats.cleanAvg >= 4 ? "bg-emerald-50 text-emerald-600" : stats.cleanAvg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-                  }`}>
-                    {stats.cleanAvg >= 4 ? "Excelente" : stats.cleanAvg >= 2.5 ? "Regular" : "Crítico"}
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Cards dinâmicos — uma categoria por card, apenas as que possuem ao menos 1 resposta no período */}
+            {RATING_CATEGORIES.filter(c => (stats.counts[c.key] || 0) > 0).map((cat) => {
+              const avg = stats.averages[cat.key];
+              const count = stats.counts[cat.key] || 0;
+              const Icon = cat.icon;
+              return (
+                <div key={cat.key} className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">{cat.label}</span>
+                    <span className="p-1.5 rounded-xl" style={{ backgroundColor: `${cat.color}1A`, color: cat.color }}>
+                      <Icon className="w-4 h-4" />
+                    </span>
+                  </div>
+                  <div className="my-3">
+                    <span className="text-3xl font-extrabold font-mono text-neutral-800">
+                      {avg !== null ? avg : "—"}
+                    </span>
+                    {avg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                    <span>{count} respostas</span>
+                    {avg !== null && (
+                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                        avg >= 4 ? "bg-emerald-50 text-emerald-600" : avg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
+                      }`}>
+                        {avg >= 4 ? "Excelente" : avg >= 2.5 ? "Regular" : "Crítico"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Charts Area - Pizza Style (Pie Chart) like Dashboard */}
@@ -495,6 +433,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
 
             const EvalCard = ({ occ }: { occ: typeof filteredOccurrences[0] }) => {
               const r = occ.ratings;
+              const gi = occ.generalInfo;
               return (
                 <div className="p-4 bg-luxury-100/30 rounded-2xl border border-luxury-200/30 hover:border-luxury-200 transition-all flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div className="space-y-2 flex-1">
@@ -510,49 +449,30 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
                       }`}>
                         {occ.occurrenceType}
                       </span>
+                      {gi?.primeiraVez && (
+                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-sky-50 text-sky-700">
+                          {gi.primeiraVez === "Sim" ? "1ª hospedagem" : "Hóspede recorrente"}
+                        </span>
+                      )}
                     </div>
                     <div className="text-neutral-700 text-xs leading-relaxed whitespace-pre-line font-serif">
                       {occ.observation}
                     </div>
                   </div>
                   {r && (
-                    <div className="grid grid-cols-2 md:flex md:items-center gap-2 shrink-0">
-                      {normalizeScore(r.wifi) !== null && (
-                        <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
-                          <Wifi className="w-3.5 h-3.5 text-indigo-500" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Wi-Fi</span>
-                            <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.wifi)}/5</span>
+                    <div className="grid grid-cols-2 md:flex md:flex-wrap md:items-center gap-2 shrink-0 max-w-full md:max-w-md">
+                      {RATING_CATEGORIES.filter(cat => normalizeScore((r as any)[cat.key]) !== null).map(cat => {
+                        const Icon = cat.icon;
+                        return (
+                          <div key={cat.key} className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
+                            <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: cat.color }} />
+                            <div className="flex flex-col">
+                              <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold whitespace-nowrap">{cat.label}</span>
+                              <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore((r as any)[cat.key])}/5</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {normalizeScore(r.alimentacao) !== null && (
-                        <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
-                          <Utensils className="w-3.5 h-3.5 text-neutral-600" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Comida</span>
-                            <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.alimentacao)}/5</span>
-                          </div>
-                        </div>
-                      )}
-                      {normalizeScore(r.atendimento) !== null && (
-                        <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
-                          <UserCheck className="w-3.5 h-3.5 text-amber-500" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Serviço</span>
-                            <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.atendimento)}/5</span>
-                          </div>
-                        </div>
-                      )}
-                      {normalizeScore(r.limpeza) !== null && (
-                        <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Limpeza</span>
-                            <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.limpeza)}/5</span>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
