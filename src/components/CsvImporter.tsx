@@ -42,6 +42,23 @@ const PORTUGUESE_MONTHS: { [key: string]: number } = {
   dez: 11, dezembro: 11
 };
 
+// Labels amigáveis para exibição das 13 categorias de pontuação (escala 1-5)
+const RATING_LABELS: { [key: string]: string } = {
+  atendimentoGeral: "Atendimento Geral",
+  wifi: "Wi-Fi",
+  boutique: "Boutique",
+  bebidas: "Bebidas",
+  alimentacao: "Alimentação",
+  areasSociais: "Áreas Sociais",
+  equipeLazer: "Equipe de Lazer",
+  estruturaLazer: "Estrutura de Lazer",
+  parqueAventuras: "Parque de Aventuras",
+  limpezaApartamento: "Limpeza do Apto",
+  estruturaApartamento: "Estrutura do Apto",
+  recepcao: "Recepção",
+  satisfacaoGeral: "Satisfação Geral"
+};
+
 export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterProps) {
   const [dragActive, setDragActive] = useState(false);
   const [parsedItems, setParsedItems] = useState<Partial<Occurrence>[]>([]);
@@ -118,6 +135,9 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
         };
         if (item.ratings) {
           payload.ratings = item.ratings;
+        }
+        if (item.generalInfo) {
+          payload.generalInfo = item.generalInfo;
         }
         batch.set(docRef, payload);
       });
@@ -289,11 +309,14 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
     const headers = firstRow.map(cleanHeader);
 
     const aptIdx = headers.findIndex(h => h.includes("apartamento") || h === "apto" || h === "quarto" || h === "apt");
-    const dateIdx = headers.findIndex(h => h.includes("data de resposta") || h.includes("data resposta") || h === "data" || h === "date" || h.includes("resposta"));
+    // IMPORTANTE: "data de resposta" também contém a palavra "resposta", então a detecção
+    // da coluna de DATA precisa ser checada com prioridade e de forma exclusiva,
+    // e a coluna de RESPOSTA (nota) não deve casar com colunas que falem de "data".
+    const dateIdx = headers.findIndex(h => h.includes("data de resposta") || h.includes("data resposta") || h === "data" || h === "date");
     const emailIdx = headers.findIndex(h => h === "email" || h === "e-mail");
     const surveyNameIdx = headers.findIndex(h => h.includes("nome da pesquisa") || h.includes("pesquisa"));
     const questionIdx = headers.findIndex(h => h === "pergunta" || h.includes("pergunta"));
-    const answerIdx = headers.findIndex(h => h === "resposta" || h.includes("resposta") || h === "valor" || h === "nota");
+    const answerIdx = headers.findIndex((h, idx) => idx !== dateIdx && (h === "resposta" || (h.includes("resposta") && !h.includes("data")) || h === "valor" || h === "nota"));
     const userIdx = headers.findIndex(h => h === "usuario" || h === "nome" || h === "cliente" || h === "hospede" || h === "user");
     const bookingIdx = headers.findIndex(h => h.includes("reserva") || h.includes("booking") || h.includes("nº") || h.includes("no") || h.includes("codigo") || h === "cod" || h === "num");
     const sectorIdx = headers.findIndex(h => h.includes("tipo de reclamacao") || h.includes("reclamacao") || h.includes("setor") || h.includes("categoria") || h === "area" || h === "dep" || h === "departamento");
@@ -383,39 +406,75 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
         return new Date().toISOString().split("T")[0];
       };
 
+      // Mapa de detecção das 13 perguntas de PONTUAÇÃO (escala 1-5) do Flexspot.
+      // Cada entrada é verificada em ordem; a primeira que "casar" com a pergunta vence.
+      // IMPORTANT: frases mais específicas vêm antes das mais genéricas para evitar
+      // que, por exemplo, "Avalie atendimento geral" seja capturada por uma regra de "recepção".
+      const RATING_MATCHERS: { key: keyof NonNullable<Partial<Occurrence>["ratings"]>; test: (q: string) => boolean }[] = [
+        { key: "atendimentoGeral", test: q => q.includes("atendimento geral") },
+        { key: "wifi", test: q => q.includes("internet") || q.includes("wifi") || q.includes("wi-fi") || q.includes("conexao") },
+        { key: "boutique", test: q => q.includes("boutique") },
+        { key: "bebidas", test: q => q.includes("bebidas") },
+        { key: "alimentacao", test: q => q.includes("alimentacao") || q.includes("comida") || q.includes("restaurante") },
+        { key: "areasSociais", test: q => q.includes("areas sociais") || q.includes("conservacao e limpeza") },
+        { key: "equipeLazer", test: q => q.includes("equipe de lazer") },
+        { key: "estruturaLazer", test: q => q.includes("estrutura de lazer") },
+        { key: "parqueAventuras", test: q => q.includes("parque de aventuras") || q.includes("parque") },
+        { key: "limpezaApartamento", test: q => q.includes("limpeza do apartamento") || q.includes("limpeza apto") },
+        { key: "estruturaApartamento", test: q => q.includes("estrutura do apartamento") || q.includes("estrutura apto") },
+        { key: "recepcao", test: q => q.includes("recepcao") },
+        { key: "satisfacaoGeral", test: q => q.includes("nivel de satisfacao") || q.includes("satisfacao") }
+      ];
+
+      // Mapa de detecção das informações GERAIS/qualitativas (não são notas).
+      const isPrimeiraVezQuestion = (q: string) => q.includes("primeira vez") || q.includes("hospedado conosco");
+      const isComentariosQuestion = (q: string) => q.includes("comentarios gerais") || q.includes("comentario") || q.includes("sugestao");
+
+      const EMPTY_COMMENT_VALUES = new Set([
+        "sem comentarios adicionais.",
+        "sem comentarios adicionais",
+        "sem comentarios",
+        "bom",
+        "ok",
+        ""
+      ]);
+
       Object.keys(groups).forEach(key => {
         const groupRows = groups[key];
         if (groupRows.length === 0) return;
 
         const firstRow = groupRows[0];
-        
-        let wifi: number | undefined = undefined;
-        let alimentacao: number | undefined = undefined;
-        let atendimento: number | undefined = undefined;
-        let limpeza: number | undefined = undefined;
+
+        // Pontuações (1-5) — separadas das informações gerais
+        const ratings: NonNullable<Partial<Occurrence>["ratings"]> = {};
+        // Informações gerais/qualitativas — nunca entram em médias
+        let primeiraVez: string | undefined = undefined;
         let commentText = "";
 
         groupRows.forEach(r => {
           const qClean = cleanHeader(r.question);
           const ans = r.answer;
 
-          // Multi-word checks to grab any matching survey question variants
-          if (qClean.includes("internet") || qClean.includes("wifi") || qClean.includes("wi-fi") || qClean.includes("conexao")) {
+          // 1) Tenta casar com uma das 13 perguntas de pontuação
+          const matcher = RATING_MATCHERS.find(m => m.test(qClean));
+          if (matcher) {
             const score = parseRatingValue(ans);
-            if (score !== undefined) wifi = score;
-          } else if (qClean.includes("alimentacao") || qClean.includes("bebidas") || qClean.includes("comida") || qClean.includes("restaurante")) {
-            const score = parseRatingValue(ans);
-            if (score !== undefined) alimentacao = score;
-          } else if (qClean.includes("recepcao") || qClean.includes("atendimento geral") || qClean.includes("servico") || qClean.includes("equipe") || qClean.includes("atendimento")) {
-            const score = parseRatingValue(ans);
-            if (score !== undefined) atendimento = score;
-          } else if (qClean.includes("limpeza") || qClean.includes("conservacao") || qClean.includes("arrumacao") || qClean.includes("governanca")) {
-            const score = parseRatingValue(ans);
-            if (score !== undefined) limpeza = score;
+            if (score !== undefined) {
+              ratings[matcher.key] = score;
+            }
+            return; // pergunta de nota não é também comentário/geral
           }
 
-          if (qClean.includes("comentarios gerais") || qClean.includes("comentario") || qClean.includes("sugestao") || qClean.includes("observacao") || qClean.includes("comentário")) {
-            if (ans && ans.toLowerCase() !== "sem comentarios adicionais" && ans.toLowerCase() !== "sem comentarios" && ans.toLowerCase() !== "bom" && ans.trim()) {
+          // 2) Pergunta "É sua primeira vez hospedado conosco?" — Sim/Não, não é nota
+          if (isPrimeiraVezQuestion(qClean)) {
+            if (ans && ans.trim()) primeiraVez = ans.trim();
+            return;
+          }
+
+          // 3) "Comentários gerais" e variações — texto livre, não é nota
+          if (isComentariosQuestion(qClean)) {
+            const ansClean = cleanHeader(ans || "");
+            if (ans && ans.trim() && !EMPTY_COMMENT_VALUES.has(ansClean)) {
               commentText = ans.trim();
             }
           }
@@ -429,18 +488,38 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           commentText = `Pesquisa de satisfação preenchida por ${userName} (Quarto ${apartment}).`;
         }
 
-        // Determine main sector of interest (choose lowest score)
+        // Determine setor de maior atenção (menor nota entre as categorias com pior cobertura de setor)
+        const SECTOR_BY_RATING_KEY: Record<string, string> = {
+          wifi: "Wifi",
+          alimentacao: "AeB",
+          bebidas: "AeB",
+          boutique: "AeB",
+          limpezaApartamento: "Governança",
+          areasSociais: "Governança",
+          atendimentoGeral: "Recepção",
+          recepcao: "Recepção",
+          equipeLazer: "Lazer",
+          estruturaLazer: "Lazer",
+          parqueAventuras: "Lazer",
+          estruturaApartamento: "Estrutura",
+          satisfacaoGeral: "Recepção"
+        };
+
+        const ratingEntries = Object.entries(ratings).filter(([, v]) => v !== undefined && v !== null) as [string, number][];
+
         let sector = "Recepção";
         let minScore = 11;
-        if (wifi !== undefined && wifi < minScore) { minScore = wifi; sector = "Wifi"; }
-        if (alimentacao !== undefined && alimentacao < minScore) { minScore = alimentacao; sector = "AeB"; }
-        if (atendimento !== undefined && atendimento < minScore) { minScore = atendimento; sector = "Recepção"; }
-        if (limpeza !== undefined && limpeza < minScore) { minScore = limpeza; sector = "Governança"; }
+        ratingEntries.forEach(([k, v]) => {
+          if (v < minScore) {
+            minScore = v;
+            sector = SECTOR_BY_RATING_KEY[k] || "Recepção";
+          }
+        });
 
         // Only overwrite to "Recepção" if ALL provided scores are identical AND excellent (>= 4)
-        const activeScores = [wifi, alimentacao, atendimento, limpeza].filter(s => s !== undefined) as number[];
-        const allIdenticalAndHigh = activeScores.length > 0 && 
-                                    activeScores.every(s => s === activeScores[0]) && 
+        const activeScores = ratingEntries.map(([, v]) => v);
+        const allIdenticalAndHigh = activeScores.length > 0 &&
+                                    activeScores.every(s => s === activeScores[0]) &&
                                     activeScores[0] >= 4;
         if (allIdenticalAndHigh) {
           sector = "Recepção";
@@ -448,7 +527,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
         // Determine occurrence status
         let occurrenceType = "Feedback positivo";
-        if (minScore <= 3) {
+        if (activeScores.length > 0 && minScore <= 3) {
           occurrenceType = "Reclamação";
         }
 
@@ -462,12 +541,14 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           source: "flexspot"
         };
 
-        if (wifi !== undefined || alimentacao !== undefined || atendimento !== undefined || limpeza !== undefined) {
-          occurrence.ratings = {
-            wifi: wifi ?? null,
-            alimentacao: alimentacao ?? null,
-            atendimento: atendimento ?? null,
-            limpeza: limpeza ?? null
+        if (ratingEntries.length > 0) {
+          occurrence.ratings = ratings;
+        }
+
+        if (primeiraVez !== undefined || commentText) {
+          occurrence.generalInfo = {
+            primeiraVez: primeiraVez ?? null,
+            comentariosGerais: commentText || null
           };
         }
 
@@ -619,8 +700,8 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           occurrence.ratings = {
             wifi: wifiVal,
             alimentacao: foodVal,
-            atendimento: serviceVal,
-            limpeza: cleanVal
+            atendimentoGeral: serviceVal,
+            limpezaApartamento: cleanVal
           };
         } else {
           occurrence.source = "resort"; // Keep original source if it has no ratings
@@ -925,26 +1006,13 @@ Nota Limpeza: 5 - Encontramos toalhas manchadas no banheiro hoje cedo."
 
                     {item.ratings && Object.keys(item.ratings).length > 0 && (
                       <div className="flex flex-wrap gap-1.5 shrink-0">
-                        {item.ratings.wifi !== undefined && (
-                          <span className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
-                            Wi-Fi: <strong>{item.ratings.wifi}</strong>
-                          </span>
-                        )}
-                        {item.ratings.alimentacao !== undefined && (
-                          <span className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
-                            Comida: <strong>{item.ratings.alimentacao}</strong>
-                          </span>
-                        )}
-                        {item.ratings.atendimento !== undefined && (
-                          <span className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
-                            Serviço: <strong>{item.ratings.atendimento}</strong>
-                          </span>
-                        )}
-                        {item.ratings.limpeza !== undefined && (
-                          <span className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
-                            Limpeza: <strong>{item.ratings.limpeza}</strong>
-                          </span>
-                        )}
+                        {Object.entries(item.ratings)
+                          .filter(([, v]) => v !== undefined && v !== null)
+                          .map(([k, v]) => (
+                            <span key={k} className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
+                              {RATING_LABELS[k] || k}: <strong>{v as number}</strong>
+                            </span>
+                          ))}
                       </div>
                     )}
                   </div>
