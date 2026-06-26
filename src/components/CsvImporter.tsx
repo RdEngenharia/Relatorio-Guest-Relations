@@ -35,6 +35,14 @@ const PORTUGUESE_MONTHS: { [key: string]: number } = {
   dez: 11, dezembro: 11
 };
 
+// Trunca uma string até o tamanho máximo permitido — usada em qualquer ponto do
+// arquivo (no parser e também na deduplicação/merge em handleConfirmImport).
+const limitStr = (val: any, max: number): string => {
+  if (val === null || val === undefined) return "";
+  const s = String(val).trim();
+  return s.length > max ? s.substring(0, max) : s;
+};
+
 export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterProps) {
   const [dragActive, setDragActive] = useState(false);
   const [parsedItems, setParsedItems] = useState<Partial<Occurrence>[]>([]);
@@ -125,12 +133,6 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
     const bookingIdx = headers.findIndex(h => h.includes("reserva") || h.includes("booking") || h.includes("nº") || h.includes("no") || h.includes("codigo") || h === "cod" || h === "num");
     const sectorIdx = headers.findIndex(h => h.includes("tipo de reclamacao") || h.includes("reclamacao") || h.includes("setor") || h.includes("categoria") || h === "area" || h === "dep" || h === "departamento");
     const obsIdx = headers.findIndex(h => h.includes("observacao") || h.includes("descricao") || h === "obs" || h.includes("relato") || h.includes("texto") || h === "detalhe" || h.includes("comentario") || h.includes("comentário"));
-
-    const limitStr = (val: any, max: number): string => {
-      if (val === null || val === undefined) return "";
-      const s = String(val).trim();
-      return s.length > max ? s.substring(0, max) : s;
-    };
 
     // If it is a Flexspot Tabular Export (specifically has a question & answer row per survey question)
     if (aptIdx !== -1 && questionIdx !== -1 && answerIdx !== -1) {
@@ -665,21 +667,22 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
   // Mass batch integration with Firestore — com deduplicação inteligente contra
   // registros já existentes, para que reimportar o mesmo arquivo (ou um arquivo que
   // contenha hóspedes já cadastrados) nunca gere avaliações duplicadas.
+  // IMPORTANTE: cada item é processado de forma INDEPENDENTE — se um item específico
+  // falhar (ex: erro de leitura pontual), os demais continuam sendo importados
+  // normalmente, em vez de travar a importação inteira.
   const handleConfirmImport = async () => {
     if (parsedItems.length === 0) return;
 
     setImporting(true);
     setNotification(null);
 
-    try {
-      let totalSaved = 0;
-      let totalMerged = 0;
-      const batch = writeBatch(db);
+    let totalSaved = 0;
+    let totalMerged = 0;
+    let totalFailed = 0;
+    const batch = writeBatch(db);
 
-      // Processa item a item porque cada um pode precisar de uma leitura prévia do
-      // Firestore para verificar se já existe um registro equivalente — mas todas as
-      // escritas são acumuladas em um único batch, commitado de uma vez ao final.
-      for (const item of parsedItems as (Partial<Occurrence> & { _dedupKey?: string })[]) {
+    for (const item of parsedItems as (Partial<Occurrence> & { _dedupKey?: string })[]) {
+      try {
         const { _dedupKey, ...cleanItem } = item;
 
         // Itens sem dedupKey (ex: planilhas genéricas sem identificação de hóspede)
@@ -739,17 +742,27 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           });
           totalSaved++;
         }
+      } catch (itemErr) {
+        // Um item específico falhou (ex: leitura de duplicidade deu erro pontual).
+        // Registra a falha e CONTINUA com os próximos itens, em vez de abortar tudo.
+        console.error("Falha ao processar item da importação, pulando este item:", item, itemErr);
+        totalFailed++;
       }
+    }
 
+    try {
       await batch.commit();
 
       const parts = [];
       if (totalSaved > 0) parts.push(`${totalSaved} nova(s) avaliação(ões) salva(s)`);
       if (totalMerged > 0) parts.push(`${totalMerged} já existente(s) atualizada(s) por média (sem duplicar)`);
+      if (totalFailed > 0) parts.push(`${totalFailed} item(ns) ignorado(s) por erro (veja o console)`);
 
       setNotification({
-        type: "success",
-        msg: `Importação concluída! ${parts.join(" e ")}.`
+        type: totalFailed > 0 && totalSaved === 0 && totalMerged === 0 ? "error" : "success",
+        msg: parts.length > 0
+          ? `Importação concluída! ${parts.join(", ")}.`
+          : "Nenhum item foi processado."
       });
 
       setTimeout(() => {
