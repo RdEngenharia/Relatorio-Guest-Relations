@@ -8,6 +8,7 @@ import {
   Cell
 } from "recharts";
 import { Wifi, Utensils, UserCheck, Sparkles, TrendingUp, Calendar, Inbox, Star, Info, Printer, Trash2, ClipboardList, ChevronLeft, ChevronRight, BarChart3, ListChecks } from "lucide-react";
+import ConfirmDialog from "./ConfirmDialog";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -199,40 +200,21 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
       </div>
 
       {/* Confirm Dialog */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
-          <div className="bg-white rounded-2xl shadow-xl border border-luxury-200/60 p-6 max-w-sm w-full mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-neutral-800 font-display">Limpar dados do Flexspot</h3>
-                <p className="text-xs text-neutral-500 mt-0.5">Esta ação não pode ser desfeita.</p>
-              </div>
-            </div>
-            <p className="text-xs text-neutral-600 mb-5 leading-relaxed">
-              Todos os <strong>{flexspotOccurrences.length} registros</strong> de avaliações do Flexspot serão excluídos permanentemente do sistema.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="px-4 py-2 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer"
-                disabled={clearing}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleClear}
-                disabled={clearing}
-                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all cursor-pointer disabled:opacity-60"
-              >
-                {clearing ? "Excluindo..." : "Sim, excluir tudo"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showConfirm}
+        title="Limpar dados do Flexspot"
+        description="Esta ação não pode ser desfeita."
+        message={
+          <>
+            Todos os <strong>{flexspotOccurrences.length} registros</strong> de avaliações do Flexspot serão excluídos permanentemente do sistema.
+          </>
+        }
+        confirmLabel="Sim, excluir tudo"
+        loading={clearing}
+        loadingLabel="Excluindo..."
+        onConfirm={handleClear}
+        onCancel={() => setShowConfirm(false)}
+      />
 
       {/* Navegação por abas: Gráficos (KPIs + pizza) vs Lista detalhada por apartamento */}
       {flexspotOccurrences.length > 0 && filteredOccurrences.length > 0 && (
