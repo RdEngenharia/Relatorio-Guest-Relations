@@ -7,13 +7,26 @@ import {
   Tooltip,
   Cell
 } from "recharts";
-import { Wifi, Utensils, UserCheck, Sparkles, TrendingUp, Calendar, Inbox, Star, Info, Printer, ClipboardList } from "lucide-react";
+import { Wifi, Utensils, UserCheck, Sparkles, TrendingUp, Calendar, Inbox, Star, Info, Printer, ClipboardList, Trash2 } from "lucide-react";
 
 interface RatingsDashboardProps {
   occurrences: Occurrence[];
+  onClearData?: () => Promise<void>;
 }
 
-export default function RatingsDashboard({ occurrences }: RatingsDashboardProps) {
+export default function RatingsDashboard({ occurrences, onClearData }: RatingsDashboardProps) {
+  const [clearing, setClearing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await onClearData?.();
+    } finally {
+      setClearing(false);
+      setShowConfirm(false);
+    }
+  };
   // Filter for occurrences that have rating information (source is "flexspot" or has occurrences with ratings object)
   const flexspotOccurrences = useMemo(() => {
     return occurrences.filter((occ) => occ.ratings && (
@@ -215,8 +228,54 @@ export default function RatingsDashboard({ occurrences }: RatingsDashboardProps)
             <Printer className="w-4 h-4" />
             Imprimir Relatório
           </button>
+
+          {onClearData && flexspotOccurrences.length > 0 && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs transition-all cursor-pointer select-none print:hidden h-9"
+            >
+              <Trash2 className="w-4 h-4" />
+              Limpar Dados
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Confirm Dialog */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-2xl shadow-xl border border-luxury-200/60 p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-neutral-800 font-display">Limpar dados do Flexspot</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="text-xs text-neutral-600 mb-5 leading-relaxed">
+              Todos os <strong>{flexspotOccurrences.length} registros</strong> de avaliações do Flexspot serão excluídos permanentemente do sistema.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer"
+                disabled={clearing}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleClear}
+                disabled={clearing}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all cursor-pointer disabled:opacity-60"
+              >
+                {clearing ? "Excluindo..." : "Sim, excluir tudo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {flexspotOccurrences.length === 0 ? (
         <div className="bg-white border border-luxury-200/60 rounded-3xl p-12 text-center max-w-lg mx-auto shadow-xs mt-10">
