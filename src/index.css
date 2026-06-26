@@ -295,13 +295,33 @@ h1, h2, h3, h4, h5, h6 {
     print-color-adjust: exact !important;
   }
 
-  /* Feed of qualitative reviews list */
+  /* Feed of qualitative reviews list — all evaluations visible without overlap */
+  #flexspot-ratings-dashboard .space-y-3 > div,
   #flexspot-ratings-dashboard .space-y-4 > div {
     border: 1px solid #e9e6dc !important;
     background-color: #fbfbf9 !important;
-    padding: 12px !important;
-    border-radius: 12px !important;
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 8px !important;
+    display: block !important;
+    -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Evaluation card inner layout in print */
+  #flexspot-ratings-dashboard .space-y-3 > div .flex,
+  #flexspot-ratings-dashboard .space-y-4 > div .flex {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* Ratings badges in print */
+  #flexspot-ratings-dashboard .space-y-3 > div .rounded-xl,
+  #flexspot-ratings-dashboard .space-y-4 > div .rounded-xl {
+    display: inline-flex !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
   }
 }
