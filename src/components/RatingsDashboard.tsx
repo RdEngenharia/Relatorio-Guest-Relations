@@ -284,8 +284,8 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
         </div>
       ) : (
         <>
-          {/* Bloco de GRÁFICOS E MÉDIAS — visível na aba "Gráficos" e sempre na impressão */}
-          <div className={activeView === "graficos" ? "space-y-6" : "hidden"}>
+          {/* Bloco de GRÁFICOS E MÉDIAS — visível apenas na aba "Gráficos", inclusive na impressão */}
+          <div id="flexspot-tab-graficos" data-tab-active={activeView === "graficos"} className={activeView === "graficos" ? "space-y-6" : "hidden print:hidden"}>
           {/* Key Metric Score Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
             {/* Overall Score */}
@@ -403,7 +403,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
           {/* Fim do bloco de GRÁFICOS E MÉDIAS */}
 
           {/* Bloco de AVALIAÇÕES POR APARTAMENTO — visível na aba "Lista" e sempre na impressão */}
-          <div className={activeView === "lista" ? "" : "hidden"}>
+          <div id="flexspot-tab-lista" data-tab-active={activeView === "lista"} className={activeView === "lista" ? "" : "hidden print:hidden"}>
           {(() => {
             const totalPages = Math.ceil(filteredOccurrences.length / ITEMS_PER_PAGE);
             const pagedOccurrences = filteredOccurrences.slice(
