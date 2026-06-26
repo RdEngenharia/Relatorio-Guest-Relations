@@ -4,6 +4,7 @@ import { doc, deleteDoc } from "firebase/firestore";
 import { Occurrence } from "../types";
 import { Search, Filter, Edit3, Trash2, Calendar, ClipboardX, ThumbsUp, AlertTriangle, AlertCircle, RefreshCw, Hotel, Globe, Printer } from "lucide-react";
 import { motion } from "motion/react";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface OccurrencesListProps {
   occurrences: Occurrence[];
@@ -37,21 +38,28 @@ export default function OccurrencesList({
   const [selectedSector, setSelectedSector] = useState("Todos");
   const [selectedType, setSelectedType] = useState("Todos");
   const [activeSheet, setActiveSheet] = useState<"resort" | "google">("resort");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Date filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Deseja realmente riscar e excluir permanentemente este registro do sistema?")) {
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setDeletingId(id);
+  };
 
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, "occurrences", id));
+      await deleteDoc(doc(db, "occurrences", deletingId));
       onDeleteSuccess();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `occurrences/${id}`);
+      handleFirestoreError(err, OperationType.DELETE, `occurrences/${deletingId}`);
+    } finally {
+      setIsDeleting(false);
+      setDeletingId(null);
     }
   };
 
@@ -427,6 +435,18 @@ export default function OccurrencesList({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        title="Excluir registro"
+        description="Esta ação não pode ser desfeita."
+        message="Deseja realmente riscar e excluir permanentemente este registro do sistema?"
+        confirmLabel="Sim, excluir"
+        loading={isDeleting}
+        loadingLabel="Excluindo..."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }
