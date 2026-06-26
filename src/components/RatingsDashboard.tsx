@@ -286,80 +286,94 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
         <>
           {/* Bloco de GRÁFICOS E MÉDIAS — visível apenas na aba "Gráficos", inclusive na impressão */}
           <div id="flexspot-tab-graficos" data-tab-active={activeView === "graficos"} className={activeView === "graficos" ? "space-y-6" : "hidden print:hidden"}>
-          {/* Key Metric Score Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-            {/* Overall Score */}
-            <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-luxury-800 to-luxury-900 text-white p-4.5 rounded-2xl border border-luxury-900 shadow-md flex flex-col justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5">
-                <Star className="w-20 h-20 text-white" />
+          {/* Balão único com a Pontuação Geral, fora do gráfico */}
+          <div className="flex justify-center">
+            <div className="bg-gradient-to-br from-luxury-800 to-luxury-900 text-white px-8 py-5 rounded-2xl border border-luxury-900 shadow-md flex items-center gap-5 relative overflow-hidden max-w-md w-full">
+              <div className="absolute top-0 right-0 p-6 opacity-5">
+                <Star className="w-16 h-16 text-white" />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-300 font-display">Pontuação Geral</span>
-                <span className="p-1 bg-white/10 rounded-lg text-brass-400"><Sparkles className="w-4 h-4" /></span>
-              </div>
-              <div className="my-3">
-                <span className="text-4xl font-black font-mono tracking-tight text-white">
+              <span className="p-2.5 bg-white/10 rounded-xl text-brass-400 shrink-0"><Sparkles className="w-5 h-5" /></span>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-300 font-display block">Pontuação Geral</span>
+                <span className="text-3xl font-black font-mono tracking-tight text-white">
                   {stats.overallAvg !== null ? stats.overallAvg : "N/A"}
                 </span>
                 <span className="text-xs text-neutral-400 ml-1 font-bold">/5</span>
+                <p className="text-[10px] text-neutral-400 font-serif mt-0.5">
+                  Média geral de {stats.totalResponses} avaliações coletadas.
+                </p>
               </div>
-              <p className="text-[10px] text-neutral-400 font-serif">
-                Média geral de {stats.totalResponses} avaliações coletadas.
-              </p>
             </div>
-
-            {/* Cards dinâmicos — uma categoria por card, apenas as que possuem ao menos 1 resposta no período */}
-            {RATING_CATEGORIES.filter(c => (stats.counts[c.key] || 0) > 0).map((cat) => {
-              const avg = stats.averages[cat.key];
-              const count = stats.counts[cat.key] || 0;
-              const Icon = cat.icon;
-              return (
-                <div key={cat.key} className="bg-white p-4.5 rounded-2xl border border-luxury-200/60 shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display">{cat.label}</span>
-                    <span className="p-1.5 rounded-xl" style={{ backgroundColor: `${cat.color}1A`, color: cat.color }}>
-                      <Icon className="w-4 h-4" />
-                    </span>
-                  </div>
-                  <div className="my-3">
-                    <span className="text-3xl font-extrabold font-mono text-neutral-800">
-                      {avg !== null ? avg : "—"}
-                    </span>
-                    {avg !== null && <span className="text-[10px] text-neutral-400 ml-1 font-bold">/5</span>}
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                    <span>{count} respostas</span>
-                    {avg !== null && (
-                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                        avg >= 4 ? "bg-emerald-50 text-emerald-600" : avg >= 2.5 ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-                      }`}>
-                        {avg >= 4 ? "Excelente" : avg >= 2.5 ? "Regular" : "Crítico"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           {/* Charts Area - Pizza Style (Pie Chart) like Dashboard */}
-          <div className="bg-white p-6 rounded-3xl border border-luxury-200/60 shadow-xs max-w-3xl mx-auto w-full">
+          <div className="bg-white p-6 rounded-3xl border border-luxury-200/60 shadow-xs max-w-3xl mx-auto w-full relative">
             <h3 className="text-xs font-black uppercase tracking-wider text-luxury-800 font-display flex items-center gap-2 mb-6 justify-center">
               <span className="w-2.5 h-2.5 bg-brass-500 rounded-full animate-pulse"></span>
               Distribuição de Avaliações por Setor (Volume)
             </h3>
+
+            {/* Nota fixa no canto explicando a escala uma única vez */}
+            <span className="absolute top-5 right-6 text-[9px] font-mono font-bold text-neutral-400 uppercase tracking-wide bg-neutral-50 border border-neutral-100 rounded-full px-2.5 py-1">
+              Notas em escala de 1 a 5
+            </span>
             
-            <div className="flex flex-col items-center justify-center relative min-h-[320px]">
-              <ResponsiveContainer width="100%" height={320}>
+            <div className="flex flex-col items-center justify-center relative w-full" style={{ height: 380 }}>
+              <ResponsiveContainer width="100%" height={380}>
                 <PieChart>
                   <Pie
                     data={sectorPieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={85}
-                    outerRadius={140}
+                    innerRadius={75}
+                    outerRadius={150}
                     paddingAngle={2}
                     dataKey="value"
+                    label={(props: any) => {
+                      // Mostra o nome do setor + a nota DENTRO das fatias grandes o bastante
+                      // para o texto caber em duas linhas sem se sobrepor à fatia vizinha.
+                      const { cx, cy, midAngle, innerRadius, outerRadius, percent, payload, name } = props;
+                      if (!percent || percent < 0.06) return null; // fatia pequena: nome fica só na legenda
+                      const RADIAN = Math.PI / 180;
+                      const radius = innerRadius + (outerRadius - innerRadius) * 0.58;
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                      const avgStr = payload?.avg !== null && payload?.avg !== undefined ? `${payload.avg}` : "";
+                      // Quebra o nome do setor em até 2 linhas curtas para caber dentro da fatia
+                      const words = String(name).split(" ");
+                      const lines: string[] = [];
+                      let current = "";
+                      words.forEach(w => {
+                        const test = current ? `${current} ${w}` : w;
+                        if (test.length > 11 && current) {
+                          lines.push(current);
+                          current = w;
+                        } else {
+                          current = test;
+                        }
+                      });
+                      if (current) lines.push(current);
+                      const nameLines = lines.slice(0, 2);
+                      return (
+                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="pointer-events-none">
+                          {nameLines.map((line, i) => (
+                            <tspan
+                              key={i}
+                              x={x}
+                              dy={i === 0 ? `${-0.3 * (nameLines.length - 1) - 0.55}em` : "1.05em"}
+                              fill="#ffffff"
+                              className="font-sans font-extrabold text-[9px]"
+                            >
+                              {line}
+                            </tspan>
+                          ))}
+                          <tspan x={x} dy="1.15em" fill="#ffffff" className="font-mono font-black text-[14px]">
+                            {avgStr}
+                          </tspan>
+                        </text>
+                      );
+                    }}
+                    labelLine={false}
                   >
                     {sectorPieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
@@ -375,28 +389,12 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
                 </PieChart>
               </ResponsiveContainer>
               
-              {/* Centered Total Indicator */}
-              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+              {/* Centered Total Indicator — verdadeiramente centralizado no contêiner */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-[10px] text-neutral-400 uppercase font-mono tracking-wider font-semibold">Total</span>
                 <span className="text-3xl font-black font-display text-neutral-800">{stats.totalResponses}</span>
                 <span className="text-[9px] font-mono text-brass-500 font-bold uppercase">Avaliações</span>
               </div>
-            </div>
-
-            {/* Legenda em grade — cada categoria com nome, média e contagem, sem sobreposição */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-neutral-100">
-              {sectorPieData.map((item, index) => (
-                <div key={index} className="flex flex-col items-center text-center p-3 rounded-2xl bg-neutral-50/40 border border-neutral-100">
-                  <div className="flex items-center gap-1.5 mb-1 justify-center">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-[10px] font-extrabold text-neutral-700 tracking-tight">{item.name}</span>
-                  </div>
-                  <div className="text-base font-extrabold text-neutral-800 font-mono">
-                    {item.avg !== null ? `${item.avg}/5` : "—"}
-                  </div>
-                  <span className="text-[9px] text-neutral-400 font-mono">{item.value} respostas</span>
-                </div>
-              ))}
             </div>
           </div>
           </div>
