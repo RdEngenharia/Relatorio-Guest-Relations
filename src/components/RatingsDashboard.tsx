@@ -286,9 +286,9 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
         <>
           {/* Bloco de GRÁFICOS E MÉDIAS — visível apenas na aba "Gráficos", inclusive na impressão */}
           <div id="flexspot-tab-graficos" data-tab-active={activeView === "graficos"} className={activeView === "graficos" ? "space-y-6" : "hidden print:hidden"}>
-          {/* Balão único com a Pontuação Geral, fora do gráfico */}
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-luxury-800 to-luxury-900 text-white px-8 py-5 rounded-2xl border border-luxury-900 shadow-md flex items-center gap-5 relative overflow-hidden max-w-md w-full">
+          {/* Balões com Pontuação Geral e Total de Respostas, fora do gráfico */}
+          <div className="flex flex-wrap justify-center gap-4">
+            <div className="bg-gradient-to-br from-luxury-800 to-luxury-900 text-white px-8 py-5 rounded-2xl border border-luxury-900 shadow-md flex items-center gap-5 relative overflow-hidden max-w-md w-full sm:w-auto">
               <div className="absolute top-0 right-0 p-6 opacity-5">
                 <Star className="w-16 h-16 text-white" />
               </div>
@@ -299,8 +299,18 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
                   {stats.overallAvg !== null ? stats.overallAvg : "N/A"}
                 </span>
                 <span className="text-xs text-neutral-400 ml-1 font-bold">/5</span>
+              </div>
+            </div>
+
+            <div className="bg-white px-8 py-5 rounded-2xl border border-luxury-200/60 shadow-xs flex items-center gap-5 relative overflow-hidden max-w-md w-full sm:w-auto">
+              <span className="p-2.5 bg-brass-500/10 rounded-xl text-brass-600 shrink-0"><ClipboardList className="w-5 h-5" /></span>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 font-display block">Total de Respostas</span>
+                <span className="text-3xl font-black font-mono tracking-tight text-neutral-800">
+                  {stats.totalResponses}
+                </span>
                 <p className="text-[10px] text-neutral-400 font-serif mt-0.5">
-                  Média geral de {stats.totalResponses} avaliações coletadas.
+                  Avaliações coletadas no período selecionado.
                 </p>
               </div>
             </div>
