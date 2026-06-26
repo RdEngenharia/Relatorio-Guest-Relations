@@ -142,13 +142,11 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
     return "bg-rose-50 text-rose-700 border-rose-100";
   };
 
-  // Custom label formatter to display Category Name, Count and Percentage directly on drawing canvas
-  const renderCustomizedLabel = (totalValue: number) => (props: any) => {
-    const { cx, cy, midAngle, outerRadius, percent, name, value } = props;
-    const calculatedPercent = totalValue > 0 ? (value / totalValue) : 0;
-    const finalPercent = typeof percent === "number" && !isNaN(percent) ? percent : calculatedPercent;
-    if (finalPercent < 0.01) return null;
-    
+  // Custom label formatter to display Category Name, Count and Average Score directly on drawing canvas
+  const renderCustomizedLabel = (props: any) => {
+    const { cx, cy, midAngle, outerRadius, percent, name, value, payload } = props;
+    if (typeof percent === "number" && !isNaN(percent) && percent < 0.01) return null;
+
     const RADIAN = Math.PI / 180;
     const sin = Math.sin(-RADIAN * midAngle);
     const cos = Math.cos(-RADIAN * midAngle);
@@ -162,6 +160,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
     
     const textAnchor = cos >= 0 ? "start" : "end";
     const itemColor = props.fill || "#888";
+    const avgLabel = payload?.avg !== null && payload?.avg !== undefined ? `${payload.avg}/5` : "N/A";
 
     return (
       <g>
@@ -188,7 +187,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
           fill="#4b5563"
           className="font-mono text-[9px] font-bold"
         >
-          {value} avaliações ({Math.round(finalPercent * 100)}%)
+          {value} avaliações (Média: {avgLabel})
         </text>
       </g>
     );
@@ -337,7 +336,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
       ) : (
         <>
           {/* Bloco de GRÁFICOS E MÉDIAS — visível na aba "Gráficos" e sempre na impressão */}
-          <div className={activeView === "graficos" ? "space-y-6" : "hidden print:block print:space-y-6"}>
+          <div className={activeView === "graficos" ? "space-y-6" : "hidden"}>
           {/* Key Metric Score Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
             {/* Overall Score */}
@@ -412,7 +411,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
                     outerRadius={115}
                     paddingAngle={3}
                     dataKey="value"
-                    label={renderCustomizedLabel(stats.totalResponses)}
+                    label={renderCustomizedLabel}
                     labelLine={false}
                   >
                     {sectorPieData.map((entry, index) => (
@@ -457,7 +456,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
           {/* Fim do bloco de GRÁFICOS E MÉDIAS */}
 
           {/* Bloco de AVALIAÇÕES POR APARTAMENTO — visível na aba "Lista" e sempre na impressão */}
-          <div className={activeView === "lista" ? "" : "hidden print:block"}>
+          <div className={activeView === "lista" ? "" : "hidden"}>
           {(() => {
             const totalPages = Math.ceil(filteredOccurrences.length / ITEMS_PER_PAGE);
             const pagedOccurrences = filteredOccurrences.slice(
