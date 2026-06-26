@@ -4,6 +4,7 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 
 import { Occurrence, SectorSummary, SavedReport } from "../types";
 import { Sparkles, FileText, Save, Printer, Trash2, Calendar, FileDown, History, Check, ShieldAlert, ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface ReportGeneratorProps {
   occurrences: Occurrence[];
@@ -27,6 +28,8 @@ export default function ReportGenerator({ occurrences }: ReportGeneratorProps) {
   
   const [isCompiling, setIsCompiling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+  const [isDeletingReport, setIsDeletingReport] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Saved reports history state
@@ -143,11 +146,15 @@ export default function ReportGenerator({ occurrences }: ReportGeneratorProps) {
     }
   };
 
-  const handleDeleteSavedReport = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteSavedReport = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm("Deseja realmente riscar e excluir permanentemente este relatório do histórico?")) {
-      return;
-    }
+    setDeletingReportId(id);
+  };
+
+  const confirmDeleteSavedReport = async () => {
+    if (!deletingReportId) return;
+    setIsDeletingReport(true);
+    const id = deletingReportId;
     try {
       await deleteDoc(doc(db, "reports", id));
       if (selectedSavedReport?.id === id) {
@@ -157,6 +164,9 @@ export default function ReportGenerator({ occurrences }: ReportGeneratorProps) {
       setAlertInfo({ type: "success", text: "Relatório apagado com sucesso!" });
     } catch (err: any) {
       handleFirestoreError(err, OperationType.DELETE, `reports/${id}`);
+    } finally {
+      setIsDeletingReport(false);
+      setDeletingReportId(null);
     }
   };
 
@@ -430,6 +440,18 @@ export default function ReportGenerator({ occurrences }: ReportGeneratorProps) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deletingReportId !== null}
+        title="Apagar relatório"
+        description="Esta ação não pode ser desfeita."
+        message="Deseja realmente riscar e excluir permanentemente este relatório do histórico?"
+        confirmLabel="Sim, excluir"
+        loading={isDeletingReport}
+        loadingLabel="Excluindo..."
+        onConfirm={confirmDeleteSavedReport}
+        onCancel={() => setDeletingReportId(null)}
+      />
     </div>
   );
 }
