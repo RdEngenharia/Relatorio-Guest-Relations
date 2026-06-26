@@ -351,16 +351,15 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
       const parseRatingValue = (valStr: string): number | undefined => {
         const cleanVal = valStr.trim();
-        const num = parseInt(cleanVal, 10);
-        if (isNaN(num)) return undefined;
-        // Keep strictly on 1-5 scale
-        if (num >= 1 && num <= 5) {
-          return num;
-        }
-        if (num > 5 && num <= 10) {
-          return Math.round(num / 2); // Fallback conversion if 10-scale was fed
-        }
-        return num;
+        const num = parseFloat(cleanVal);
+        if (isNaN(num) || num <= 0) return undefined;
+        // Already on 1-5 scale
+        if (num <= 5) return Math.round(num);
+        // 6-10 scale → convert to 1-5
+        if (num <= 10) return Math.round((num / 10) * 5);
+        // 1-100 percentage scale → convert to 1-5
+        if (num <= 100) return Math.round((num / 100) * 5);
+        return undefined;
       };
 
       const parseFlexspotDate = (rawDate: string): string => {
