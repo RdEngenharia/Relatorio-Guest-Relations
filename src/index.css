@@ -324,4 +324,12 @@ h1, h2, h3, h4, h5, h6 {
     padding: 4px 8px !important;
     font-size: 10px !important;
   }
+
+  /* Garante que apenas a aba ativa (Gráficos ou Lista por Apartamento) seja impressa,
+     mesmo que alguma regra acima tente reexibir elementos internos. Máxima especificidade
+     via ID para vencer qualquer conflito de cascata. */
+  #flexspot-tab-graficos[data-tab-active="false"],
+  #flexspot-tab-lista[data-tab-active="false"] {
+    display: none !important;
+  }
 }
