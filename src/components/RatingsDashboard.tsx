@@ -142,57 +142,6 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
     return "bg-rose-50 text-rose-700 border-rose-100";
   };
 
-  // Custom label formatter to display Category Name, Count and Average Score directly on drawing canvas
-  const renderCustomizedLabel = (props: any) => {
-    const { cx, cy, midAngle, outerRadius, percent, name, value, payload } = props;
-    if (typeof percent === "number" && !isNaN(percent) && percent < 0.01) return null;
-
-    const RADIAN = Math.PI / 180;
-    const sin = Math.sin(-RADIAN * midAngle);
-    const cos = Math.cos(-RADIAN * midAngle);
-    
-    const sx = cx + (outerRadius + 3) * cos;
-    const sy = cy + (outerRadius + 3) * sin;
-    const mx = cx + (outerRadius + 20) * cos;
-    const my = cy + (outerRadius + 20) * sin;
-    const ex = mx + (cos >= 0 ? 1 : -1) * 20;
-    const ey = my;
-    
-    const textAnchor = cos >= 0 ? "start" : "end";
-    const itemColor = props.fill || "#888";
-    const avgLabel = payload?.avg !== null && payload?.avg !== undefined ? `${payload.avg}/5` : "N/A";
-
-    return (
-      <g>
-        <path
-          d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
-          stroke={itemColor}
-          strokeWidth={1.5}
-          fill="none"
-        />
-        <circle cx={ex} cy={ey} r={3} fill={itemColor} />
-        <text
-          x={ex + (cos >= 0 ? 6 : -6)}
-          y={ey - 4}
-          textAnchor={textAnchor}
-          fill="#1f2937"
-          className="font-extrabold text-[11px] font-sans"
-        >
-          {name}
-        </text>
-        <text
-          x={ex + (cos >= 0 ? 6 : -6)}
-          y={ey + 10}
-          textAnchor={textAnchor}
-          fill="#4b5563"
-          className="font-mono text-[9px] font-bold"
-        >
-          {value} avaliações (Média: {avgLabel})
-        </text>
-      </g>
-    );
-  };
-
   return (
     <div id="flexspot-ratings-dashboard" className="space-y-6">
       {/* Date Filter Panel & Title */}
@@ -400,29 +349,27 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               Distribuição de Avaliações por Setor (Volume)
             </h3>
             
-            <div className="flex flex-col items-center justify-center relative min-h-[360px]">
-              <ResponsiveContainer width="100%" height={360}>
+            <div className="flex flex-col items-center justify-center relative min-h-[320px]">
+              <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie
                     data={sectorPieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={75}
-                    outerRadius={115}
-                    paddingAngle={3}
+                    innerRadius={85}
+                    outerRadius={140}
+                    paddingAngle={2}
                     dataKey="value"
-                    label={renderCustomizedLabel}
-                    labelLine={false}
                   >
                     {sectorPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{ borderRadius: "12px", border: "1px solid #e9e6dc", fontFamily: "Inter, sans-serif", fontSize: "11px" }}
                     formatter={(value: any, name: any, props: any) => {
                       const avgStr = props.payload.avg !== null ? `${props.payload.avg}/5` : "N/A";
-                      return [`${value} avaliações (Média: ${avgStr})`, "Volume"];
+                      return [`${value} avaliações (Média: ${avgStr})`, name];
                     }}
                   />
                 </PieChart>
@@ -436,7 +383,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               </div>
             </div>
 
-            {/* Custom Interactive Legend below the chart to show Average Ratings directly */}
+            {/* Legenda em grade — cada categoria com nome, média e contagem, sem sobreposição */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-neutral-100">
               {sectorPieData.map((item, index) => (
                 <div key={index} className="flex flex-col items-center text-center p-3 rounded-2xl bg-neutral-50/40 border border-neutral-100">
