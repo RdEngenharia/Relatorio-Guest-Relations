@@ -58,11 +58,11 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
   const [startDate, setStartDate] = useState(getInitialStartDate());
   const [endDate, setEndDate] = useState(getTodayDate());
 
-  // Filter list by selected dates
+  // Filter list by selected dates — ordenado por data da avaliação, mais recente primeiro
   const filteredOccurrences = useMemo(() => {
-    return flexspotOccurrences.filter((occ) => {
-      return occ.date >= startDate && occ.date <= endDate;
-    });
+    return flexspotOccurrences
+      .filter((occ) => occ.date >= startDate && occ.date <= endDate)
+      .sort((a, b) => b.date.localeCompare(a.date));
   }, [flexspotOccurrences, startDate, endDate]);
 
   // Reseta a paginação da lista sempre que o período filtrado mudar
