@@ -328,7 +328,7 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               Notas em escala de 1 a 5
             </span>
             
-            <div className="flex flex-col items-center justify-center relative w-full" style={{ height: 380 }}>
+            <div id="flexspot-piechart-container" className="flex flex-col items-center justify-center relative w-full" style={{ height: 380 }}>
               <ResponsiveContainer width="100%" height={380}>
                 <PieChart>
                   <Pie
