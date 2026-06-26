@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { db, handleFirestoreError, OperationType } from "../firebase";
-import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp, getDocs, query, collection, where, getDoc } from "firebase/firestore";
 import { Occurrence } from "../types";
 import { 
   Upload, 
@@ -376,7 +376,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           occurrenceType = "Reclamação";
         }
 
-        const occurrence: Partial<Occurrence> = {
+        const occurrence: Partial<Occurrence> & { _dedupKey?: string } = {
           date: limitStr(finalDate, 32),
           bookingNumber: limitStr(`FLEXSPOT-${apartment}-${Math.floor(1000 + Math.random() * 9000)}`, 32),
           apartment: limitStr(apartment, 32),
@@ -385,6 +385,11 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           observation: limitStr(commentText, 5000),
           source: "flexspot"
         };
+
+        // Chave de deduplicação: identifica de forma estável o MESMO hóspede no MESMO
+        // apartamento no MESMO dia, independente de quantas vezes este arquivo seja
+        // reimportado. Usada em handleConfirmImport para evitar registros duplicados.
+        occurrence._dedupKey = `${apartment}|||${userName}|||${finalDate}`.toLowerCase();
 
         if (ratingEntries.length > 0) {
           occurrence.ratings = ratings;
@@ -643,7 +648,21 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
     }
   };
 
-  // Mass batch integration with Firestore to satisfy performance guidelines
+  // Gera um ID de documento determinístico e estável a partir da dedupKey, para que
+  // reimportar o mesmo hóspede/apartamento/dia sempre aponte para o MESMO documento
+  // no Firestore, em vez de criar uma cópia nova a cada importação.
+  const slugifyDedupKey = (key: string): string => {
+    return key
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/gi, "_")
+      .replace(/^_+|_+$/g, "")
+      .substring(0, 100);
+  };
+
+  // Mass batch integration with Firestore — com deduplicação inteligente contra
+  // registros já existentes, para que reimportar o mesmo arquivo (ou um arquivo que
+  // contenha hóspedes já cadastrados) nunca gere avaliações duplicadas.
   const handleConfirmImport = async () => {
     if (parsedItems.length === 0) return;
 
@@ -651,39 +670,84 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
     setNotification(null);
 
     try {
-      // Chunk batch operations of Firestore (maximum 500 writes per batch size)
-      const maxBatchSize = 400;
       let totalSaved = 0;
+      let totalMerged = 0;
+      const batch = writeBatch(db);
 
-      for (let i = 0; i < parsedItems.length; i += maxBatchSize) {
-        const batch = writeBatch(db);
-        const chunk = parsedItems.slice(i, i + maxBatchSize);
+      // Processa item a item porque cada um pode precisar de uma leitura prévia do
+      // Firestore para verificar se já existe um registro equivalente — mas todas as
+      // escritas são acumuladas em um único batch, commitado de uma vez ao final.
+      for (const item of parsedItems as (Partial<Occurrence> & { _dedupKey?: string })[]) {
+        const { _dedupKey, ...cleanItem } = item;
 
-        chunk.forEach((item) => {
+        // Itens sem dedupKey (ex: planilhas genéricas sem identificação de hóspede)
+        // são sempre gravados como registro novo, com ID aleatório como antes.
+        if (!_dedupKey) {
           const docRef = doc(db, "occurrences", `occ_batch_${Date.now()}__${Math.floor(Math.random() * 1000000)}`);
-          const rawData = {
-            ...item,
-            source: item.source || "resort",
+          batch.set(docRef, {
+            ...cleanItem,
+            source: cleanItem.source || "resort",
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
-          };
-          console.log("GRAVANDO EM LOTE NO FIRESTORE - PAYLOAD:", JSON.stringify(rawData, (key, value) => {
-            // handle serverTimestamp serialization in JSON.stringify output gracefully
-            if (value && typeof value === "object" && value.constructor && value.constructor.name === "FieldValue") {
-              return "[FieldValue.serverTimestamp]";
-            }
-            return value;
-          }, 2));
-          batch.set(docRef, rawData);
-        });
+          });
+          totalSaved++;
+          continue;
+        }
 
-        await batch.commit();
-        totalSaved += chunk.length;
+        const docId = `flexspot_${slugifyDedupKey(_dedupKey)}`;
+        const docRef = doc(db, "occurrences", docId);
+        const existingSnap = await getDoc(docRef);
+
+        if (existingSnap.exists()) {
+          // Já existe um registro para este hóspede/apartamento/dia: mescla as notas
+          // calculando a MÉDIA entre o que já estava salvo e a nova resposta importada,
+          // em vez de duplicar ou simplesmente sobrescrever.
+          const existing = existingSnap.data() as Occurrence;
+          const mergedRatings: Record<string, number> = {};
+          const allKeys = new Set([
+            ...Object.keys(existing.ratings || {}),
+            ...Object.keys(cleanItem.ratings || {})
+          ]);
+          allKeys.forEach((k) => {
+            const oldVal = (existing.ratings as any)?.[k];
+            const newVal = (cleanItem.ratings as any)?.[k];
+            const values = [oldVal, newVal].filter((v) => v !== undefined && v !== null) as number[];
+            if (values.length > 0) {
+              mergedRatings[k] = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+            }
+          });
+
+          batch.set(docRef, {
+            ...cleanItem,
+            ratings: mergedRatings,
+            observation: existing.observation?.includes("consolidada")
+              ? existing.observation
+              : limitStr(`${cleanItem.observation} (Consolidado com avaliação já existente para este hóspede/dia.)`, 5000),
+            source: cleanItem.source || existing.source || "resort",
+            createdAt: existing.createdAt,
+            updatedAt: serverTimestamp()
+          });
+          totalMerged++;
+        } else {
+          batch.set(docRef, {
+            ...cleanItem,
+            source: cleanItem.source || "resort",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          totalSaved++;
+        }
       }
+
+      await batch.commit();
+
+      const parts = [];
+      if (totalSaved > 0) parts.push(`${totalSaved} nova(s) avaliação(ões) salva(s)`);
+      if (totalMerged > 0) parts.push(`${totalMerged} já existente(s) atualizada(s) por média (sem duplicar)`);
 
       setNotification({
         type: "success",
-        msg: `Importação em lote concluída com sucesso! ${totalSaved} ocorrências foram salvas no console.`
+        msg: `Importação concluída! ${parts.join(" e ")}.`
       });
 
       setTimeout(() => {
