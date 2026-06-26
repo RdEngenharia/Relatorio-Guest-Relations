@@ -194,19 +194,30 @@ Você DEVE OBRIGATORIAMENTE AGRUPAR todas as linhas pertencentes à mesma sessã
 
 Regras de Consolidação e Processamento:
 1. Agrupamento: Identifique as linhas que possuem o mesmo "apartamento", "usuário" e "data de resposta" (ou data de resposta no mesmo dia e minuto) e agrupe-as em um único objeto de avaliação.
-2. Mapeamento de Notas (Ratings):
-   - Perguntas contendo "internet/wifi", "wi-fi", "wifi", "conexão" -> mapear o número correspondente da resposta para "ratings.wifi".
-   - Perguntas contendo "alimentação", "alimentos", "bebidas", "comida", "restaurante" -> mapear o número correspondente da resposta para "ratings.alimentacao".
-   - Perguntas contendo "recepção", "atendimento geral", "serviço", "equipe" -> mapear o número correspondente da resposta para "ratings.atendimento".
-   - Perguntas contendo "limpeza do apartamento", "limpeza de quarto", "conservação e limpeza" -> mapear o número correspondente da resposta para "ratings.limpeza".
-3. ESCALA DE NOTAS (Conversão de 1 a 5 para 1 a 10):
-   Se as notas originais do sistema Flexspot estiverem na escala de 1 a 5 (por exemplo: "5", "4", "3", "2", "1"), converta-as obrigatoriamente para a escala de 1 a 10 multiplicando-as por 2 (ex: nota 5 vira 10, nota 4 vira 8, nota 3 vira 6, nota 2 vira 4, nota 1 vira 2). Se a nota já estiver em escala de 1 a 10, mantenha o valor original.
-4. "observation" (Comentário do Hóspede):
-   - Se houver uma linha de pergunta do tipo "Comentários gerais" ou "Comentários adicionais", utilize o texto da resposta como a observação principal.
+2. Mapeamento de Notas (Ratings) — TODAS as perguntas abaixo são notas em escala de 1 a 5 e devem ser mapeadas para o objeto "ratings". NÃO descarte nenhuma:
+   - "Avalie atendimento geral" -> "ratings.atendimentoGeral"
+   - "Avalie a internet/wifi" (ou variações "wi-fi", "conexão") -> "ratings.wifi"
+   - "Avalie boutique" -> "ratings.boutique"
+   - "Avalie bebidas" -> "ratings.bebidas"
+   - "Avalie alimentação" (ou "comida", "restaurante") -> "ratings.alimentacao"
+   - "Avalie a conservação e limpeza das áreas sociais" -> "ratings.areasSociais"
+   - "Avalie equipe de lazer" -> "ratings.equipeLazer"
+   - "Avalie nossa estrutura de lazer" -> "ratings.estruturaLazer"
+   - "Avalie nosso parque de aventuras" -> "ratings.parqueAventuras"
+   - "Avalie limpeza do apartamento" -> "ratings.limpezaApartamento"
+   - "Avalie nossa estrutura do apartamento" -> "ratings.estruturaApartamento"
+   - "Avalie a nossa recepção" -> "ratings.recepcao"
+   - "No geral, como ficou seu nível de satisfação?" -> "ratings.satisfacaoGeral"
+3. ESCALA DE NOTAS: as notas do Flexspot já estão na escala de 1 a 5. Mantenha o valor original sem nenhuma conversão ou multiplicação — NÃO multiplique por 2, NÃO converta para escala de 1 a 10.
+4. Informações GERAIS (não são notas — vão em "generalInfo", nunca em "ratings"):
+   - "É sua primeira vez hospedado conosco?" (resposta "Sim"/"Não") -> "generalInfo.primeiraVez"
+   - "Comentários gerais" ou "Comentários adicionais" (texto livre) -> "generalInfo.comentariosGerais". Ignore respostas vazias/genéricas como "Sem comentários adicionais", "Ok", "Bom" (trate como null nesse caso).
+5. "observation" (texto principal exibido na lista):
+   - Se houver um comentário de texto válido em "generalInfo.comentariosGerais", utilize-o também como a observação principal.
    - Se não houver nenhum comentário de texto, gere uma observação sumarizada elegante em português com base nas notas consolidadas, por exemplo: "Pesquisa respondida pelo hóspede (Notas gerais excelentes)." ou "Avaliação regular com pontos de atenção coletados."
-5. "occurrenceType": Classifique estritamente como "Reclamação" se houver alguma nota de setor consolidada que seja menor que 6/10 (ou menor que 3/5 na escala original) ou se a observação contiver reclamações explícitas. Caso contrário, use "Feedback positivo".
-6. "sector": Escolha o setor principal com base na menor nota ou principal reclamação: "AeB", "Estrutura", "TI", "Lazer", "Manutenção", "Governança", "Recepção", "All inclusive", "Wifi" ou "Outro".
-7. "date": A data da avaliação formatada em "YYYY-MM-DD". Se o formato na planilha for "DD/MM/YY HH:MM" (ex: "26/06/26 09:38"), converta para "2026-06-26". Se não houver data, use "${today}".
+6. "occurrenceType": Classifique estritamente como "Reclamação" se qualquer nota em "ratings" for menor ou igual a 3 (na escala de 1 a 5), ou se a observação contiver reclamações explícitas. Caso contrário, use "Feedback positivo".
+7. "sector": Escolha o setor principal com base na menor nota entre as categorias de "ratings", ou na principal reclamação do texto: "AeB", "Estrutura", "TI", "Lazer", "Manutenção", "Governança", "Recepção", "All inclusive", "Wifi" ou "Outro".
+8. "date": A data da avaliação formatada em "YYYY-MM-DD". Se o formato na planilha for "DD/MM/YY HH:MM" (ex: "26/06/26 09:38"), converta para "2026-06-26". Se não houver data, use "${today}".
 
 Retorne rigorosamente um array JSON contendo esses objetos estruturados em conformidade com o esquema fornecido.`;
 
@@ -229,10 +240,26 @@ Retorne rigorosamente um array JSON contendo esses objetos estruturados em confo
               ratings: {
                 type: Type.OBJECT,
                 properties: {
+                  atendimentoGeral: { type: Type.INTEGER },
                   wifi: { type: Type.INTEGER },
+                  boutique: { type: Type.INTEGER },
+                  bebidas: { type: Type.INTEGER },
                   alimentacao: { type: Type.INTEGER },
-                  atendimento: { type: Type.INTEGER },
-                  limpeza: { type: Type.INTEGER }
+                  areasSociais: { type: Type.INTEGER },
+                  equipeLazer: { type: Type.INTEGER },
+                  estruturaLazer: { type: Type.INTEGER },
+                  parqueAventuras: { type: Type.INTEGER },
+                  limpezaApartamento: { type: Type.INTEGER },
+                  estruturaApartamento: { type: Type.INTEGER },
+                  recepcao: { type: Type.INTEGER },
+                  satisfacaoGeral: { type: Type.INTEGER }
+                }
+              },
+              generalInfo: {
+                type: Type.OBJECT,
+                properties: {
+                  primeiraVez: { type: Type.STRING },
+                  comentariosGerais: { type: Type.STRING }
                 }
               }
             },
