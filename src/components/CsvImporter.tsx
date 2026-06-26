@@ -12,6 +12,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { motion } from "motion/react";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface CsvImporterProps {
   onImportFinished: () => void;
@@ -42,6 +43,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
   const [importing, setImporting] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Download template CSV helper
   const handleDownloadTemplate = () => {
@@ -768,6 +770,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
     setParsedItems([]);
     setFileName("");
     setNotification(null);
+    setShowResetConfirm(false);
   };
 
   return (
@@ -852,7 +855,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
                   Arquivo: <span className="text-neutral-700 bg-luxury-100 px-2 py-0.5 rounded font-mono font-medium">{fileName}</span>
                 </div>
                 <button
-                  onClick={handleClear}
+                  onClick={() => setShowResetConfirm(true)}
                   className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-wider cursor-pointer"
                 >
                   Excluir e resetar planilha
@@ -929,6 +932,21 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
             )}
           </div>
       </div>
+
+      <ConfirmDialog
+        open={showResetConfirm}
+        title="Resetar planilha"
+        description="Esta ação não pode ser desfeita."
+        message={
+          <>
+            A leitura atual do arquivo <strong>{fileName}</strong> será descartada. Nada ainda foi salvo na nuvem — isso apenas limpa a pré-visualização desta tela.
+          </>
+        }
+        confirmLabel="Sim, excluir e resetar"
+        loadingLabel="Excluindo..."
+        onConfirm={handleClear}
+        onCancel={() => setShowResetConfirm(false)}
+      />
     </div>
   );
 }
