@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Occurrence } from "../types";
 import {
   ResponsiveContainer,
@@ -7,7 +7,7 @@ import {
   Tooltip,
   Cell
 } from "recharts";
-import { Wifi, Utensils, UserCheck, Sparkles, TrendingUp, Calendar, Inbox, Star, Info, Printer, ClipboardList, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wifi, Utensils, UserCheck, Sparkles, TrendingUp, Calendar, Inbox, Star, Info, Printer, Trash2, ClipboardList, ChevronLeft, ChevronRight, BarChart3, ListChecks } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -25,6 +25,7 @@ const normalizeScore = (v: number | null | undefined): number | null => {
 export default function RatingsDashboard({ occurrences, onClearData }: RatingsDashboardProps) {
   const [clearing, setClearing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [activeView, setActiveView] = useState<"graficos" | "lista">("graficos");
   const [currentPage, setCurrentPage] = useState(1);
 
   const handleClear = async () => {
@@ -59,11 +60,15 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
 
   // Filter list by selected dates
   const filteredOccurrences = useMemo(() => {
-    setCurrentPage(1);
     return flexspotOccurrences.filter((occ) => {
       return occ.date >= startDate && occ.date <= endDate;
     });
   }, [flexspotOccurrences, startDate, endDate]);
+
+  // Reseta a paginação da lista sempre que o período filtrado mudar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate]);
 
   // Definição das 13 categorias de pontuação exibidas no dashboard, com metadados visuais.
   const RATING_CATEGORIES: { key: keyof NonNullable<Occurrence["ratings"]>; label: string; color: string; icon: any }[] = [
@@ -281,6 +286,30 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
         </div>
       )}
 
+      {/* Navegação por abas: Gráficos (KPIs + pizza) vs Lista detalhada por apartamento */}
+      {flexspotOccurrences.length > 0 && filteredOccurrences.length > 0 && (
+        <div className="flex items-center gap-2 bg-luxury-100/40 p-1.5 rounded-xl border border-luxury-200/30 w-fit print:hidden">
+          <button
+            onClick={() => setActiveView("graficos")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeView === "graficos" ? "bg-luxury-800 text-white shadow-sm" : "text-neutral-500 hover:bg-luxury-100"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Gráficos e Médias
+          </button>
+          <button
+            onClick={() => setActiveView("lista")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeView === "lista" ? "bg-luxury-800 text-white shadow-sm" : "text-neutral-500 hover:bg-luxury-100"
+            }`}
+          >
+            <ListChecks className="w-4 h-4" />
+            Avaliações por Apartamento
+          </button>
+        </div>
+      )}
+
       {flexspotOccurrences.length === 0 ? (
         <div className="bg-white border border-luxury-200/60 rounded-3xl p-12 text-center max-w-lg mx-auto shadow-xs mt-10">
           <div className="w-16 h-16 bg-luxury-100 rounded-full flex items-center justify-center text-brass-500 mx-auto mb-4 border border-luxury-200/30">
@@ -307,6 +336,8 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
         </div>
       ) : (
         <>
+          {/* Bloco de GRÁFICOS E MÉDIAS — visível na aba "Gráficos" e sempre na impressão */}
+          <div className={activeView === "graficos" ? "space-y-6" : "hidden print:block print:space-y-6"}>
           {/* Key Metric Score Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
             {/* Overall Score */}
@@ -422,8 +453,11 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               ))}
             </div>
           </div>
+          </div>
+          {/* Fim do bloco de GRÁFICOS E MÉDIAS */}
 
-          {/* Recent Evaluations list — screen view with pagination */}
+          {/* Bloco de AVALIAÇÕES POR APARTAMENTO — visível na aba "Lista" e sempre na impressão */}
+          <div className={activeView === "lista" ? "" : "hidden print:block"}>
           {(() => {
             const totalPages = Math.ceil(filteredOccurrences.length / ITEMS_PER_PAGE);
             const pagedOccurrences = filteredOccurrences.slice(
@@ -527,6 +561,8 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
               </div>
             );
           })()}
+          </div>
+          {/* Fim do bloco de AVALIAÇÕES POR APARTAMENTO */}
         </>
       )}
     </div>
