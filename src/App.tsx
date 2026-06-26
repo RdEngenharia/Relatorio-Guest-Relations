@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { auth, db, logoutUser } from "./firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, onSnapshot, doc, getDocFromServer } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDocFromServer, deleteDoc, writeBatch } from "firebase/firestore";
 import { Occurrence } from "./types";
 
 // Inner Components
@@ -92,6 +92,23 @@ export default function App() {
   const handleCancelEdit = () => {
     setEditingOccurrence(null);
     setActiveTab("list");
+  };
+
+  const handleClearFlexspotData = async () => {
+    const flexspotOccs = occurrences.filter(
+      (occ) => occ.ratings && (
+        occ.ratings.wifi !== null ||
+        occ.ratings.alimentacao !== null ||
+        occ.ratings.atendimento !== null ||
+        occ.ratings.limpeza !== null
+      )
+    );
+    if (flexspotOccs.length === 0) return;
+    const batch = writeBatch(db);
+    flexspotOccs.forEach((occ) => {
+      batch.delete(doc(db, "occurrences", occ.id));
+    });
+    await batch.commit();
   };
 
   if (authLoading) {
@@ -285,7 +302,7 @@ export default function App() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <RatingsDashboard occurrences={occurrences} />
+              <RatingsDashboard occurrences={occurrences} onClearData={handleClearFlexspotData} />
             </motion.div>
           )}
 
