@@ -135,10 +135,20 @@ h1, h2, h3, h4, h5, h6 {
     page-break-inside: avoid !important;
   }
 
-  #piechart-subcontainer {
+  /* Os contêineres do donut e seus ResponsiveContainer internos precisam ter a
+     MESMA altura na impressão, ou o indicador central de total fica descentralizado
+     em relação ao SVG do gráfico (que se ajusta à altura do Recharts, não à do wrapper). */
+  #piechart-subcontainer-complaints,
+  #piechart-subcontainer-positive {
     width: 100% !important;
-    height: 350px !important;
-    display: block !important;
+    height: 550px !important;
+    display: flex !important;
+  }
+
+  #piechart-subcontainer-complaints .recharts-responsive-container,
+  #piechart-subcontainer-positive .recharts-responsive-container {
+    height: 550px !important;
+    min-height: 550px !important;
   }
 
   /* Stylize compiled report canvas to fit perfect A4 document formats */
@@ -282,11 +292,22 @@ h1, h2, h3, h4, h5, h6 {
     display: block !important;
   }
 
+  /* O contêiner do donut e o ResponsiveContainer do Recharts dentro dele PRECISAM
+     ter exatamente a mesma altura na impressão — caso contrário o indicador central
+     "Total/Avaliações" (que se centraliza em relação ao contêiner externo) fica
+     descolado do centro real do gráfico SVG (que se ajusta à altura do Recharts). */
+  #flexspot-piechart-container {
+    height: 380px !important;
+  }
+
+  #flexspot-piechart-container .recharts-responsive-container {
+    height: 380px !important;
+    min-height: 380px !important;
+  }
+
   .recharts-responsive-container {
     min-width: 200px !important;
-    min-height: 220px !important;
     width: 100% !important;
-    height: 220px !important;
   }
 
   /* Colors and SVGs force adjustments inside printed documents */
