@@ -14,6 +14,14 @@ interface RatingsDashboardProps {
   onClearData?: () => Promise<void>;
 }
 
+const normalizeScore = (v: number | null | undefined): number | null => {
+  if (v === null || v === undefined) return null;
+  if (v <= 5) return v;
+  if (v <= 10) return Math.round((v / 10) * 5);
+  if (v <= 100) return Math.round((v / 100) * 5);
+  return null;
+};
+
 export default function RatingsDashboard({ occurrences, onClearData }: RatingsDashboardProps) {
   const [clearing, setClearing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -68,28 +76,21 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
     filteredOccurrences.forEach((occ) => {
       const r = occ.ratings;
       if (!r) return;
-      if (typeof r.wifi === "number") {
-        wifiSum += r.wifi;
-        wifiCount++;
-      }
-      if (typeof r.alimentacao === "number") {
-        foodSum += r.alimentacao;
-        foodCount++;
-      }
-      if (typeof r.atendimento === "number") {
-        serviceSum += r.atendimento;
-        serviceCount++;
-      }
-      if (typeof r.limpeza === "number") {
-        cleanSum += r.limpeza;
-        cleanCount++;
-      }
+      const w = normalizeScore(r.wifi);
+      const f = normalizeScore(r.alimentacao);
+      const s = normalizeScore(r.atendimento);
+      const c = normalizeScore(r.limpeza);
+      if (w !== null) { wifiSum += w; wifiCount++; }
+      if (f !== null) { foodSum += f; foodCount++; }
+      if (s !== null) { serviceSum += s; serviceCount++; }
+      if (c !== null) { cleanSum += c; cleanCount++; }
     });
 
-    const wifiAvg = wifiCount > 0 ? Number((wifiSum / wifiCount).toFixed(1)) : null;
-    const foodAvg = foodCount > 0 ? Number((foodSum / foodCount).toFixed(1)) : null;
-    const serviceAvg = serviceCount > 0 ? Number((serviceSum / serviceCount).toFixed(1)) : null;
-    const cleanAvg = cleanCount > 0 ? Number((cleanSum / cleanCount).toFixed(1)) : null;
+    const capAvg = (val: number) => Math.min(5, Number(val.toFixed(1)));
+    const wifiAvg = wifiCount > 0 ? capAvg(wifiSum / wifiCount) : null;
+    const foodAvg = foodCount > 0 ? capAvg(foodSum / foodCount) : null;
+    const serviceAvg = serviceCount > 0 ? capAvg(serviceSum / serviceCount) : null;
+    const cleanAvg = cleanCount > 0 ? capAvg(cleanSum / cleanCount) : null;
 
     // Overall Average
     let overallSum = 0;
@@ -517,39 +518,39 @@ export default function RatingsDashboard({ occurrences, onClearData }: RatingsDa
                     {/* Sector Ratings grid inside item */}
                     {r && (
                       <div className="grid grid-cols-2 md:flex md:items-center gap-2 shrink-0">
-                        {typeof r.wifi === "number" && (
+                        {normalizeScore(r.wifi) !== null && (
                           <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
                             <Wifi className="w-3.5 h-3.5 text-indigo-500" />
                             <div className="flex flex-col">
                               <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Wi-Fi</span>
-                              <span className="text-xs font-bold text-neutral-800 font-mono">{r.wifi}/5</span>
+                              <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.wifi)}/5</span>
                             </div>
                           </div>
                         )}
-                        {typeof r.alimentacao === "number" && (
+                        {normalizeScore(r.alimentacao) !== null && (
                           <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
                             <Utensils className="w-3.5 h-3.5 text-neutral-600" />
                             <div className="flex flex-col">
                               <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Comida</span>
-                              <span className="text-xs font-bold text-neutral-800 font-mono">{r.alimentacao}/5</span>
+                              <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.alimentacao)}/5</span>
                             </div>
                           </div>
                         )}
-                        {typeof r.atendimento === "number" && (
+                        {normalizeScore(r.atendimento) !== null && (
                           <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
                             <UserCheck className="w-3.5 h-3.5 text-amber-500" />
                             <div className="flex flex-col">
                               <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Serviço</span>
-                              <span className="text-xs font-bold text-neutral-800 font-mono">{r.atendimento}/5</span>
+                              <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.atendimento)}/5</span>
                             </div>
                           </div>
                         )}
-                        {typeof r.limpeza === "number" && (
+                        {normalizeScore(r.limpeza) !== null && (
                           <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-xl flex items-center gap-2">
                             <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
                             <div className="flex flex-col">
                               <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-bold">Limpeza</span>
-                              <span className="text-xs font-bold text-neutral-800 font-mono">{r.limpeza}/5</span>
+                              <span className="text-xs font-bold text-neutral-800 font-mono">{normalizeScore(r.limpeza)}/5</span>
                             </div>
                           </div>
                         )}
