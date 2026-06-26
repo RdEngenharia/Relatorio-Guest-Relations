@@ -96,12 +96,7 @@ export default function App() {
 
   const handleClearFlexspotData = async () => {
     const flexspotOccs = occurrences.filter(
-      (occ) => occ.ratings && (
-        occ.ratings.wifi !== null ||
-        occ.ratings.alimentacao !== null ||
-        occ.ratings.atendimento !== null ||
-        occ.ratings.limpeza !== null
-      )
+      (occ) => occ.ratings && Object.values(occ.ratings).some((v) => v !== null && v !== undefined)
     );
     if (flexspotOccs.length === 0) return;
     const batch = writeBatch(db);
