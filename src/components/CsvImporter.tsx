@@ -6,18 +6,10 @@ import { Occurrence } from "../types";
 import { 
   Upload, 
   FileSpreadsheet, 
-  AlertTriangle, 
   Check, 
   RefreshCw, 
-  X, 
   Download, 
-  HelpCircle, 
-  Sparkles, 
-  Globe,
-  Copy,
-  Send,
-  Terminal,
-  Activity
+  HelpCircle
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -42,23 +34,6 @@ const PORTUGUESE_MONTHS: { [key: string]: number } = {
   dez: 11, dezembro: 11
 };
 
-// Labels amigáveis para exibição das 13 categorias de pontuação (escala 1-5)
-const RATING_LABELS: { [key: string]: string } = {
-  atendimentoGeral: "Atendimento Geral",
-  wifi: "Wi-Fi",
-  boutique: "Boutique",
-  bebidas: "Bebidas",
-  alimentacao: "Alimentação",
-  areasSociais: "Áreas Sociais",
-  equipeLazer: "Equipe de Lazer",
-  estruturaLazer: "Estrutura de Lazer",
-  parqueAventuras: "Parque de Aventuras",
-  limpezaApartamento: "Limpeza do Apto",
-  estruturaApartamento: "Estrutura do Apto",
-  recepcao: "Recepção",
-  satisfacaoGeral: "Satisfação Geral"
-};
-
 export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterProps) {
   const [dragActive, setDragActive] = useState(false);
   const [parsedItems, setParsedItems] = useState<Partial<Occurrence>[]>([]);
@@ -67,179 +42,6 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
   const [importing, setImporting] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [seeding, setSeeding] = useState(false);
-  const [importMode, setImportMode] = useState<"csv" | "copypaste">("copypaste"); // Default to copypaste for immediate utility
-
-  // States for copy-pasting raw text from Flexspot
-  const [pastedText, setPastedText] = useState("");
-  const [parsingText, setParsingText] = useState(false);
-  const [parsedPastedItems, setParsedPastedItems] = useState<any[]>([]);
-  const [savingPastedItems, setSavingPastedItems] = useState(false);
-
-  const handleParsePastedText = async () => {
-    if (!pastedText.trim()) {
-      setNotification({ type: "error", msg: "Por favor, selecione e cole o texto contendo as avaliações da tela do seu portal Flexspot." });
-      return;
-    }
-
-    setParsingText(true);
-    setNotification(null);
-    setParsedPastedItems([]);
-
-    try {
-      const response = await fetch("/api/parse-pasted-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText: pastedText })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setParsedPastedItems(data.items);
-        if (data.items.length === 0) {
-          setNotification({ type: "error", msg: "Não identificamos nenhuma avaliação nesse bloco de texto. Experimente selecionar mais texto da sua listagem do Flexspot." });
-        } else {
-          setNotification({ type: "success", msg: `Sucesso! O Gemini interpretou as informações e encontrou ${data.items.length} avaliações prontas para importação.` });
-        }
-      } else {
-        setNotification({ type: "error", msg: data.error || "Erro ao processar o texto no servidor." });
-      }
-    } catch (err: any) {
-      setNotification({ type: "error", msg: err.message || "Falha de rede ao tentar se conectar ao processador inteligente." });
-    } finally {
-      setParsingText(false);
-    }
-  };
-
-  const handleSavePastedItems = async () => {
-    if (parsedPastedItems.length === 0) return;
-
-    setSavingPastedItems(true);
-    setNotification(null);
-
-    try {
-      const batch = writeBatch(db);
-
-      parsedPastedItems.forEach((item) => {
-        const docRef = doc(db, "occurrences", `flexspot_paste_${Date.now()}__${Math.floor(Math.random() * 1000000)}`);
-        const payload: any = {
-          date: item.date,
-          bookingNumber: item.bookingNumber,
-          apartment: item.apartment,
-          occurrenceType: item.occurrenceType,
-          sector: item.sector,
-          observation: item.observation,
-          source: "flexspot",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-        if (item.ratings) {
-          payload.ratings = item.ratings;
-        }
-        if (item.generalInfo) {
-          payload.generalInfo = item.generalInfo;
-        }
-        batch.set(docRef, payload);
-      });
-
-      await batch.commit();
-
-      setNotification({
-        type: "success",
-        msg: `Sucesso absoluto! ${parsedPastedItems.length} avaliações do portal Flexspot foram importadas com sucesso.`
-      });
-
-      setPastedText("");
-      setParsedPastedItems([]);
-
-      setTimeout(() => {
-        onImportFinished();
-      }, 1500);
-    } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, "occurrences/pasted_import");
-      setNotification({
-        type: "error",
-        msg: "Erro na gravação em lote no Firestore. Verifique suas conexões e tente novamente."
-      });
-    } finally {
-      setSavingPastedItems(false);
-    }
-  };
-
-
-
-  const handleSeedGoogleTestData = async () => {
-    setSeeding(true);
-    setNotification(null);
-    try {
-      const batch = writeBatch(db);
-      const googleFictionalData: Partial<Occurrence>[] = [
-        {
-          date: "2026-05-25",
-          bookingNumber: "S/R",
-          apartment: "S/A",
-          occurrenceType: "Reclamação",
-          sector: "Wifi",
-          observation: "A internet wifi nas dependências comuns do resort e no bangalô estava extremamente lenta. Quase impossível trabalhar de home office ou assistir a um vídeo simples. Para o nível de luxo ofertado, a conexão de fibra deveria ser impecável.",
-          source: "google"
-        },
-        {
-          date: "2026-05-26",
-          bookingNumber: "S/R",
-          apartment: "S/A",
-          occurrenceType: "Reclamação",
-          sector: "AeB",
-          observation: "Ficamos muito desapontados com as opções do buffet do restaurante principal. A reposição de pratos nobres demorou muito, as filas para a grelha de carnes ultrapassavam 15 minutos e os sucos servidos no café da manhã pareciam artificiais.",
-          source: "google"
-        },
-        {
-          date: "2026-05-27",
-          bookingNumber: "S/R",
-          apartment: "S/A",
-          occurrenceType: "Reclamação",
-          sector: "Lazer",
-          observation: "Monitores da equipe de recreação infantil parecem sobrecarregados e dispersos. No clube infantil, deixaram menores de idade saírem sozinhos em direção à piscina grande sem que nenhum adulto percebesse. Falta de atenção inadmissível!",
-          source: "google"
-        },
-        {
-          date: "2026-05-28",
-          bookingNumber: "S/R",
-          apartment: "S/A",
-          occurrenceType: "Reclamação",
-          sector: "Manutenção",
-          observation: "O ar-condicionado do quarto estava pingando água no chão e emitindo um ruído metálico ensurdecedor a noite inteira. Abrimos chamado às 20h e até o momento do checkout ninguém compareceu para consertar.",
-          source: "google"
-        }
-      ];
-
-      googleFictionalData.forEach((item) => {
-        const id = `occ_google_seed_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
-        const docRef = doc(db, "occurrences", id);
-        batch.set(docRef, {
-          ...item,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      });
-
-      await batch.commit();
-      setNotification({
-        type: "success",
-        msg: "Sucesso! Semeamos as 4 reclamações de teste do Google na nuvem. Você já pode visualizá-las no Histórico (Folha Google) e usá-las para testar a compilação com IA."
-      });
-      setTimeout(() => {
-        onImportFinished();
-      }, 2000);
-    } catch (err: any) {
-      console.error(err);
-      setNotification({
-        type: "error",
-        msg: "Erro ao gerar base de testes rápidos do Google no Firestore."
-      });
-    } finally {
-      setSeeding(false);
-    }
-  };
 
   // Download template CSV helper
   const handleDownloadTemplate = () => {
@@ -863,168 +665,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
 
   return (
     <div className="space-y-6">
-      {/* Mode Selector Tab Bar */}
-      <div className="flex bg-white p-1 rounded-2xl border border-luxury-200 shadow-sm max-w-md mx-auto print:hidden">
-        <button
-          onClick={() => {
-            setImportMode("copypaste");
-            setNotification(null);
-          }}
-          className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 select-none ${
-            importMode === "copypaste"
-              ? "bg-luxury-800 text-white shadow-sm"
-              : "text-neutral-500 hover:text-neutral-800 hover:bg-luxury-50"
-          }`}
-        >
-          <Copy className="w-4 h-4 text-brass-500" />
-          Importar Copiando do Flexspot (IA)
-        </button>
-        <button
-          onClick={() => {
-            setImportMode("csv");
-            setNotification(null);
-          }}
-          className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 select-none ${
-            importMode === "csv"
-              ? "bg-luxury-800 text-white shadow-sm"
-              : "text-neutral-500 hover:text-neutral-800 hover:bg-luxury-50"
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4 text-neutral-400" />
-          Planilha CSV
-        </button>
-      </div>
-
-      {importMode === "copypaste" && (
-        <div id="copypaste-importer-container" className="bg-white rounded-2xl border border-luxury-200 shadow-sm p-6 space-y-6">
-          <div className="border-b border-luxury-100 pb-4">
-            <h3 className="text-base font-semibold font-display text-neutral-800 flex items-center gap-2">
-              <Copy className="w-5 h-5 text-brass-500" />
-              <span>Importação por Cópia do Portal Flexspot (Inteligência Artificial)</span>
-            </h3>
-            <p className="text-xs text-neutral-500 mt-1">
-              Como o Flexspot não possui um botão físico para exportar as avaliações antigas, você pode simplesmente <strong>copiar o texto da tela</strong> (com Ctrl+A / Ctrl+C ou selecionando as linhas) e colar aqui. Nosso processador inteligente com Gemini AI irá ler, estruturar e salvar as avaliações automaticamente!
-            </p>
-          </div>
-
-          {notification && (
-            <motion.div
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`p-3.5 rounded-xl text-xs font-medium ${
-                notification.type === "success"
-                  ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-                  : "bg-rose-50 border border-rose-200 text-rose-800"
-              }`}
-            >
-              {notification.msg}
-            </motion.div>
-          )}
-
-          <div className="space-y-3">
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
-              Cole aqui o conteúdo copiado do Flexspot:
-            </label>
-            <textarea
-              value={pastedText}
-              onChange={(e) => setPastedText(e.target.value)}
-              placeholder="Exemplo de conteúdo para colar:
-Felipe Costa - Quarto 104
-Nota Wi-Fi: 2 - Sinal muito fraco na varanda, impossível navegar.
-
-Paula Lima - Quarto 202
-Nota Limpeza: 5 - Encontramos toalhas manchadas no banheiro hoje cedo."
-              className="w-full h-48 p-4 text-xs font-mono border border-luxury-200 rounded-2xl focus:ring-1 focus:ring-brass-500 focus:border-brass-500 outline-none resize-y bg-neutral-50/50"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              onClick={handleParsePastedText}
-              disabled={parsingText || !pastedText.trim()}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-luxury-800 hover:bg-neutral-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-            >
-              {parsingText ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Gemini Analisando Textos...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-brass-400" />
-                  Processar e Ler com Gemini AI
-                </>
-              )}
-            </button>
-
-            {parsedPastedItems.length > 0 && (
-              <button
-                onClick={handleSavePastedItems}
-                disabled={savingPastedItems}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md animate-pulse"
-              >
-                {savingPastedItems ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Salvando Ocorrências...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 text-white" />
-                    Confirmar e Gravar {parsedPastedItems.length} Avaliações
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          {parsedPastedItems.length > 0 && (
-            <div className="border-t border-luxury-100 pt-5 space-y-3">
-              <h4 className="text-xs font-black uppercase tracking-wider text-neutral-500 flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500" />
-                <span>Resultados da Leitura da IA:</span>
-              </h4>
-              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                {parsedPastedItems.map((item, idx) => (
-                  <div key={idx} className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col md:flex-row md:items-start justify-between gap-3 text-xs">
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-1.5 py-0.5 bg-neutral-800 text-white rounded-md text-[9px] font-mono font-bold uppercase">
-                          Quarto {item.apartment}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                          item.occurrenceType === "Reclamação" ? "bg-rose-50 border border-rose-100 text-rose-700" : "bg-emerald-50 border border-emerald-100 text-emerald-700"
-                        }`}>
-                          {item.occurrenceType}
-                        </span>
-                        <span className="text-[10px] text-neutral-400 font-mono font-bold uppercase">
-                          Setor: {item.sector}
-                        </span>
-                      </div>
-                      <p className="text-neutral-700 italic font-sans leading-relaxed">"{item.observation}"</p>
-                    </div>
-
-                    {item.ratings && Object.keys(item.ratings).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 shrink-0">
-                        {Object.entries(item.ratings)
-                          .filter(([, v]) => v !== undefined && v !== null)
-                          .map(([k, v]) => (
-                            <span key={k} className="px-2 py-1 bg-white border border-neutral-200 rounded-md text-[10px] font-mono">
-                              {RATING_LABELS[k] || k}: <strong>{v as number}</strong>
-                            </span>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {importMode === "csv" && (
-        <div id="csv-importer-container" className="bg-white rounded-2xl border border-luxury-200 shadow-sm p-6 space-y-6">
+      <div id="csv-importer-container" className="bg-white rounded-2xl border border-luxury-200 shadow-sm p-6 space-y-6">
           <div className="flex items-center justify-between border-b border-luxury-100 pb-4">
             <div>
               <h3 className="text-base font-semibold font-display text-neutral-800 flex items-center gap-2">
@@ -1057,29 +698,6 @@ Nota Limpeza: 5 - Encontramos toalhas manchadas no banheiro hoje cedo."
             >
               {notification.msg}
             </motion.div>
-          )}
-
-          {/* Quick Test Seeder Tool requested by the user */}
-          {parsedItems.length === 0 && (
-            <div id="test-seeder-banner" className="bg-brass-500/10 border border-brass-200/50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-neutral-850 flex items-center gap-1.5 font-display uppercase tracking-wider">
-                  <Sparkles className="w-4 h-4 text-brass-600 animate-pulse" />
-                  <span>Massa de Teste Rápida (4 Avaliações do Google)</span>
-                </h4>
-                <p className="text-xs text-neutral-600 leading-relaxed font-sans">
-                  Insira instantaneamente as <strong>4 reclamações do Google para testes rápidos</strong> de gráficos segregados, filtros e compilação de relatórios com IA.
-                </p>
-              </div>
-              <button
-                onClick={handleSeedGoogleTestData}
-                disabled={seeding}
-                className="px-4 py-2.5 bg-luxury-800 hover:bg-neutral-950 active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center justify-center gap-2 border border-luxury-900 shadow-sm"
-              >
-                <Globe className="w-4 h-4 text-brass-500" />
-                {seeding ? "Criando Registros..." : "Gerar 4 Reclamações de Teste"}
-              </button>
-            </div>
           )}
 
           {/* File Dropping Zone */}
@@ -1203,8 +821,7 @@ Nota Limpeza: 5 - Encontramos toalhas manchadas no banheiro hoje cedo."
               </button>
             )}
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
