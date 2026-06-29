@@ -10,17 +10,16 @@ import OccurrenceForm from "./components/OccurrenceForm";
 import DashboardView from "./components/DashboardView";
 import OccurrencesList from "./components/OccurrencesList";
 import CsvImporter from "./components/CsvImporter";
-import RatingsDashboard from "./components/RatingsDashboard";
 
 // Icons
-import { LayoutDashboard, PlusCircle, FileSpreadsheet, LogOut, Hotel, Sparkles, UserCheck, Upload, Award } from "lucide-react";
+import { LayoutDashboard, PlusCircle, FileSpreadsheet, LogOut, Hotel, UserCheck, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "list" | "form" | "import" | "ratings">("ratings");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "list" | "form" | "import">("dashboard");
   const [editingOccurrence, setEditingOccurrence] = useState<Occurrence | null>(null);
 
   // Firestore connection checker mandated by Firebase Skill instructions
@@ -86,17 +85,22 @@ export default function App() {
 
   const handleSaveFinished = () => {
     setEditingOccurrence(null);
-    setActiveTab("list");
+    setActiveTab("dashboard");
   };
 
   const handleCancelEdit = () => {
     setEditingOccurrence(null);
-    setActiveTab("list");
+    setActiveTab("dashboard");
   };
 
   const handleClearFlexspotData = async () => {
     const flexspotOccs = occurrences.filter(
-      (occ) => occ.ratings && Object.values(occ.ratings).some((v) => v !== null && v !== undefined)
+      (occ) => occ.ratings && (
+        occ.ratings.wifi !== null ||
+        occ.ratings.alimentacao !== null ||
+        occ.ratings.atendimento !== null ||
+        occ.ratings.limpeza !== null
+      )
     );
     if (flexspotOccs.length === 0) return;
     const batch = writeBatch(db);
@@ -192,18 +196,6 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => { setActiveTab("ratings"); setEditingOccurrence(null); }}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
-              activeTab === "ratings"
-                ? "bg-luxury-800 text-white shadow-xs"
-                : "text-neutral-500 hover:bg-luxury-100"
-            }`}
-          >
-            <Award className="w-4 h-4 text-brass-500" />
-            Satisfação Flexspot
-          </button>
-
-          <button
             onClick={() => { setActiveTab("list"); setEditingOccurrence(null); }}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
               activeTab === "list"
@@ -252,7 +244,11 @@ export default function App() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <DashboardView occurrences={occurrences} />
+              <DashboardView
+                occurrences={occurrences}
+                onEditRequested={handleEditRequest}
+                onClearFlexspotData={handleClearFlexspotData}
+              />
             </motion.div>
           )}
 
@@ -286,18 +282,6 @@ export default function App() {
                 onSaveFinished={handleSaveFinished}
                 onCancelEdit={handleCancelEdit}
               />
-            </motion.div>
-          )}
-
-          {activeTab === "ratings" && (
-            <motion.div
-              key="ratings"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-            >
-              <RatingsDashboard occurrences={occurrences} onClearData={handleClearFlexspotData} />
             </motion.div>
           )}
 
