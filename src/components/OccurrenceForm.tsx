@@ -142,7 +142,7 @@ export default function OccurrenceForm({
     setNotification(null);
 
     const docId = editingOccurrence ? editingOccurrence.id : `occ_${Date.now()}`;
-    const payload = {
+    const payload: Record<string, unknown> = {
       date,
       bookingNumber: finalBooking,
       apartment: finalApartment,
@@ -153,6 +153,10 @@ export default function OccurrenceForm({
       createdAt: editingOccurrence ? editingOccurrence.createdAt : serverTimestamp(),
       updatedAt: serverTimestamp()
     };
+
+    if (editingOccurrence?.ratings) {
+      payload.ratings = editingOccurrence.ratings;
+    }
 
     try {
       await setDoc(doc(db, "occurrences", docId), payload);
