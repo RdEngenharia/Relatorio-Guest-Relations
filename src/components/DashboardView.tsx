@@ -1,279 +1,297 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Occurrence } from "../types";
 import {
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend
+  Cell
 } from "recharts";
-import { ClipboardList, ThumbsUp, AlertTriangle, HelpCircle, TrendingUp, Calendar, Hotel, Globe, Printer } from "lucide-react";
-import { motion } from "motion/react";
+import {
+  ClipboardList, ThumbsUp, AlertTriangle, HelpCircle, TrendingUp,
+  Calendar, Hotel, Globe, Printer, Wifi, Utensils, UserCheck,
+  Star, Edit3, Trash2, Filter, ChevronLeft, ChevronRight, Award, RefreshCw
+} from "lucide-react";
 
 interface DashboardViewProps {
   occurrences: Occurrence[];
+  onEditRequested: (occ: Occurrence) => void;
+  onClearFlexspotData: () => Promise<void>;
 }
 
-// Warm, sophisticated luxury hospitality color palette
 const SECTOR_COLORS: { [key: string]: string } = {
-  "AeB": "#1c3d5a",           // Deep Blue Navy
-  "Estrutura": "#c59b27",     // Rich Olive Gold
-  "TI": "#57534e",            // Stone Slate
-  "Lazer": "#0d9488",         // Custom Pine-Teal
-  "Manutenção": "#9a3412",    // Terracotta-Brick
-  "Governança": "#0891b2",    // Sky Turquoise
-  "Recepção": "#d97706",      // Amber-Copper
-  "All inclusive": "#047857", // Deep Forest-Emerald
-  "Wifi": "#4338ca",          // Indigo Accent
-  "Programações": "#8d0801",  // Bold Maroon
-  "Outro": "#78716c",         // Soft Warm Gray
+  "AeB": "#1c3d5a",
+  "Estrutura": "#c59b27",
+  "TI": "#57534e",
+  "Lazer": "#0d9488",
+  "Manutenção": "#9a3412",
+  "Governança": "#0891b2",
+  "Recepção": "#d97706",
+  "All inclusive": "#047857",
+  "Wifi": "#4338ca",
+  "Programações": "#8d0801",
+  "Outro": "#78716c",
 };
 
-export default function DashboardView({ occurrences }: DashboardViewProps) {
-  const getInitialStartDate = () => {
-    const d = new Date();
-    d.setDate(1); // Default to start of current month
-    return d.toISOString().split("T")[0];
-  };
+const SECTORS = [
+  "Todos", "AeB", "Estrutura", "TI", "Lazer", "Manutenção",
+  "Governança", "Recepção", "All inclusive", "Wifi", "Programações", "Outro"
+];
 
-  const getTodayDate = () => {
-    return new Date().toISOString().split("T")[0];
-  };
+const ITEMS_PER_PAGE = 8;
 
+const normalizeScore = (v: number | null | undefined): number | null => {
+  if (v === null || v === undefined) return null;
+  if (v >= 1 && v <= 5) return v;
+  return null;
+};
+
+const getInitialStartDate = () => {
+  const d = new Date();
+  d.setDate(1);
+  return d.toISOString().split("T")[0];
+};
+
+const getTodayDate = () => new Date().toISOString().split("T")[0];
+
+export default function DashboardView({ occurrences, onEditRequested, onClearFlexspotData }: DashboardViewProps) {
   const [startDate, setStartDate] = useState(getInitialStartDate());
   const [endDate, setEndDate] = useState(getTodayDate());
   const [activeSheet, setActiveSheet] = useState<"resort" | "google">("resort");
+  const [selectedSector, setSelectedSector] = useState("Todos");
+  const [flexCurrentPage, setFlexCurrentPage] = useState(1);
+  const [clearingFlex, setClearingFlex] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // Filter occurrences strictly by sheet (source) and date
-  const filtered = occurrences.filter((occ) => {
+  // ─── Resort / Google filtered data ───────────────────────────────────────
+  const filtered = useMemo(() => occurrences.filter((occ) => {
     const matchesSource = activeSheet === "google"
       ? occ.source === "google"
       : (occ.source === "resort" || !occ.source);
-    return matchesSource && occ.date >= startDate && occ.date <= endDate;
-  });
+    const matchesDate = occ.date >= startDate && occ.date <= endDate;
+    const matchesSector = selectedSector === "Todos" || occ.sector === selectedSector;
+    return matchesSource && matchesDate && matchesSector;
+  }), [occurrences, activeSheet, startDate, endDate, selectedSector]);
 
   const totalCount = filtered.length;
   const complaints = filtered.filter(o => o.occurrenceType === "Reclamação");
   const positiveFeedbacks = filtered.filter(o => o.occurrenceType === "Feedback positivo");
   const extraType = filtered.filter(o => o.occurrenceType === "Outro");
 
-  // Dynamically calculate sector counts
-  const sectorCountsMap: { [key: string]: number } = {};
-  filtered.forEach((occ) => {
-    // Only count occurrences of type 'Reclamação' in the chart to reflect the original "PERCENTUAL DE RECLAMAÇÕES"
-    if (occ.occurrenceType === "Reclamação") {
-      sectorCountsMap[occ.sector] = (sectorCountsMap[occ.sector] || 0) + 1;
-    }
-  });
+  const buildChartData = (type: string) => {
+    const map: { [key: string]: number } = {};
+    filtered.forEach((occ) => {
+      if (occ.occurrenceType === type) {
+        map[occ.sector] = (map[occ.sector] || 0) + 1;
+      }
+    });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value, color: SECTOR_COLORS[name] || "#a8a29e" }))
+      .sort((a, b) => b.value - a.value);
+  };
 
-  const chartData = Object.keys(sectorCountsMap).map((sec) => ({
-    name: sec,
-    value: sectorCountsMap[sec],
-    color: SECTOR_COLORS[sec] || SECTOR_COLORS[sec.charAt(0).toUpperCase() + sec.slice(1).toLowerCase()] || "#a8a29e"
-  })).sort((a, b) => b.value - a.value);
+  const complaintsChart = buildChartData("Reclamação");
+  const positivesChart = buildChartData("Feedback positivo");
+  const totalComplaints = complaintsChart.reduce((s, e) => s + e.value, 0);
+  const totalPositives = positivesChart.reduce((s, e) => s + e.value, 0);
 
-  const totalComplaintsValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
+  // ─── FlexSpot ratings section ────────────────────────────────────────────
+  const flexspotOccurrences = useMemo(() =>
+    occurrences.filter((occ) => occ.ratings && (
+      occ.ratings.wifi !== null ||
+      occ.ratings.alimentacao !== null ||
+      occ.ratings.atendimento !== null ||
+      occ.ratings.limpeza !== null
+    )), [occurrences]);
 
-  // Dynamically calculate positive reviews sector counts
-  const positiveCountsMap: { [key: string]: number } = {};
-  filtered.forEach((occ) => {
-    if (occ.occurrenceType === "Feedback positivo") {
-      positiveCountsMap[occ.sector] = (positiveCountsMap[occ.sector] || 0) + 1;
-    }
-  });
+  const filteredFlex = useMemo(() => {
+    setFlexCurrentPage(1);
+    return flexspotOccurrences.filter((occ) => occ.date >= startDate && occ.date <= endDate);
+  }, [flexspotOccurrences, startDate, endDate]);
 
-  const positiveChartData = Object.keys(positiveCountsMap).map((sec) => ({
-    name: sec,
-    value: positiveCountsMap[sec],
-    color: SECTOR_COLORS[sec] || SECTOR_COLORS[sec.charAt(0).toUpperCase() + sec.slice(1).toLowerCase()] || "#a8a29e"
-  })).sort((a, b) => b.value - a.value);
+  const stats = useMemo(() => {
+    let wifiSum = 0, wifiCount = 0, foodSum = 0, foodCount = 0;
+    let serviceSum = 0, serviceCount = 0, cleanSum = 0, cleanCount = 0;
+    filteredFlex.forEach((occ) => {
+      const r = occ.ratings;
+      if (!r) return;
+      const w = normalizeScore(r.wifi);
+      const f = normalizeScore(r.alimentacao);
+      const s = normalizeScore(r.atendimento);
+      const c = normalizeScore(r.limpeza);
+      if (w !== null) { wifiSum += w; wifiCount++; }
+      if (f !== null) { foodSum += f; foodCount++; }
+      if (s !== null) { serviceSum += s; serviceCount++; }
+      if (c !== null) { cleanSum += c; cleanCount++; }
+    });
+    const cap = (v: number) => Math.min(5, Number(v.toFixed(1)));
+    const wifiAvg = wifiCount > 0 ? cap(wifiSum / wifiCount) : null;
+    const foodAvg = foodCount > 0 ? cap(foodSum / foodCount) : null;
+    const serviceAvg = serviceCount > 0 ? cap(serviceSum / serviceCount) : null;
+    const cleanAvg = cleanCount > 0 ? cap(cleanSum / cleanCount) : null;
+    const avgs = [wifiAvg, foodAvg, serviceAvg, cleanAvg].filter(v => v !== null) as number[];
+    const overallAvg = avgs.length > 0 ? Number((avgs.reduce((s, v) => s + v, 0) / avgs.length).toFixed(1)) : null;
+    return { wifiAvg, wifiCount, foodAvg, foodCount, serviceAvg, serviceCount, cleanAvg, cleanCount, overallAvg, totalResponses: filteredFlex.length };
+  }, [filteredFlex]);
 
-  const totalPositiveValue = positiveChartData.reduce((acc, curr) => acc + curr.value, 0);
+  const flexTotalPages = Math.ceil(filteredFlex.length / ITEMS_PER_PAGE);
+  const flexPage = filteredFlex.slice((flexCurrentPage - 1) * ITEMS_PER_PAGE, flexCurrentPage * ITEMS_PER_PAGE);
 
-  // Custom label formatter to display Category Name, Count and Percentage directly on drawing canvas
-  const renderCustomizedLabel = (totalValue: number) => (props: any) => {
-    const { cx, cy, midAngle, outerRadius, percent, name, value } = props;
-    
-    // Fallback calculation in case Recharts cannot compute percent or active sheet data has a rendering quirk
-    const calculatedPercent = totalValue > 0 ? (value / totalValue) : 0;
-    const finalPercent = typeof percent === "number" && !isNaN(percent) ? percent : calculatedPercent;
-    
-    if (finalPercent < 0.01) return null; // Do not render label for 0% or trivial slices to prevent overlap
-    
-    const RADIAN = Math.PI / 180;
-    const sin = Math.sin(-RADIAN * midAngle);
-    const cos = Math.cos(-RADIAN * midAngle);
-    
-    // Starting coordinates near slice boundary, extension coordinate, text horizontal extension line
-    const sx = cx + (outerRadius + 3) * cos;
-    const sy = cy + (outerRadius + 3) * sin;
-    const mx = cx + (outerRadius + 24) * cos;
-    const my = cy + (outerRadius + 24) * sin;
-    const ex = mx + (cos >= 0 ? 1 : -1) * 25;
-    const ey = my;
-    
-    const textAnchor = cos >= 0 ? "start" : "end";
-    const itemColor = SECTOR_COLORS[name] || SECTOR_COLORS[name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()] || props.fill || "#888";
+  const handleClearFlex = async () => {
+    setClearingFlex(true);
+    try { await onClearFlexspotData(); } finally { setClearingFlex(false); setShowClearConfirm(false); }
+  };
 
+  const ScoreBar = ({ score }: { score: number | null }) => {
+    if (score === null) return <span className="text-neutral-300 text-xs">—</span>;
+    const pct = (score / 5) * 100;
+    const color = score >= 4 ? "#059669" : score >= 3 ? "#d97706" : "#dc2626";
     return (
-      <g>
-        {/* Connection line */}
-        <path
-          d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
-          stroke={itemColor}
-          strokeWidth={1.5}
-          fill="none"
-        />
-        {/* Decorative end point indicator dot */}
-        <circle cx={ex} cy={ey} r={3} fill={itemColor} />
-        {/* Category Label text */}
-        <text
-          x={ex + (cos >= 0 ? 6 : -6)}
-          y={ey - 4}
-          textAnchor={textAnchor}
-          fill="#1f2937"
-          className="font-extrabold text-[12px] font-sans"
-        >
-          {name}
-        </text>
-        {/* Value and Percentage detail text */}
-        <text
-          x={ex + (cos >= 0 ? 6 : -6)}
-          y={ey + 10}
-          textAnchor={textAnchor}
-          fill="#4b5563"
-          className="font-mono text-[10px] font-bold"
-        >
-          {`${value} (${Math.round(finalPercent * 100)}%)`}
-        </text>
-      </g>
+      <div className="flex items-center gap-1.5">
+        <div className="w-16 h-1.5 bg-luxury-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+        </div>
+        <span className="text-[11px] font-mono font-bold" style={{ color }}>{score}</span>
+      </div>
     );
   };
 
-  return (
-    <div id="dashboard-view-panel" className="space-y-6">
-      {/* Print-Only Premium Header Block for Direct Browser Prints */}
-      <div className="hidden print:block mb-6 border-b-2 border-luxury-800 pb-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-neutral-900 font-display uppercase tracking-wider">
-              RELATÓRIO DE SÍNTESE ANALÍTICA
-            </h1>
-            <p className="text-[11px] text-neutral-500 font-serif italic mt-0.5">
-              Guest Relations — Análise de Desempenho e Reclamações Diárias
-            </p>
-          </div>
-          <div className="text-right">
-            <span className="text-xs font-bold text-brass-600 uppercase font-display block">
-              {activeSheet === "google" ? "Folha Google Reviews" : "Folha Ocorrências Resort"}
-            </span>
-            <span className="text-[10px] font-mono text-neutral-500 mt-1 block">
-              Período: {startDate ? startDate.split("-").reverse().join("/") : "Sem Limite"} até {endDate ? endDate.split("-").reverse().join("/") : "Hoje"}
-            </span>
-          </div>
+  const ChartBar = ({ data, label, emptyMsg, emptyIcon: EmptyIcon }: {
+    data: { name: string; value: number; color: string }[];
+    label: string;
+    emptyMsg: string;
+    emptyIcon: React.ComponentType<any>;
+  }) => (
+    <div className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
+      <h3 className="text-sm font-semibold font-display text-neutral-800 uppercase tracking-wider flex items-center gap-2 mb-4">
+        <TrendingUp className="w-4 h-4 text-brass-500" />
+        <span>{label}</span>
+      </h3>
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={Math.max(200, data.length * 44)}>
+          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 50, bottom: 4, left: 90 }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0ede4" />
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#374151", fontWeight: 600 }} tickLine={false} axisLine={false} width={86} />
+            <Tooltip
+              contentStyle={{ borderRadius: "12px", border: "1px solid #e9e6dc", fontSize: 12 }}
+              formatter={(value: any) => [value, "Qtde"]}
+              cursor={{ fill: "rgba(0,0,0,0.04)" }}
+            />
+            <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={28} label={{ position: "right", fontSize: 11, fill: "#6b7280" }}>
+              {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex flex-col items-center justify-center min-h-[180px] text-center text-neutral-400">
+          <EmptyIcon className="w-10 h-10 stroke-1 mb-2 text-neutral-300" />
+          <p className="text-sm font-medium">{emptyMsg}</p>
         </div>
+      )}
+    </div>
+  );
+
+  const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const fmtDate = (d: string) => {
+    const obj = new Date(d + "T12:00:00");
+    return `${String(obj.getDate()).padStart(2, "0")}/${monthNames[obj.getMonth()]}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Print header */}
+      <div className="hidden print:block mb-6 border-b-2 border-luxury-800 pb-5">
+        <h1 className="text-xl font-extrabold text-neutral-900 font-display uppercase tracking-wider">DASHBOARD DE OCORRÊNCIAS</h1>
+        <p className="text-[11px] text-neutral-500 font-serif italic mt-0.5">Guest Relations — Análise de Desempenho</p>
       </div>
 
-      {/* Folhas Separadas Switcher */}
-      <div id="sheets-tab-selector" className="bg-white p-1.5 rounded-2xl border border-luxury-200 flex flex-col sm:flex-row gap-1.5 shadow-xs print:hidden">
+      {/* Source Switcher */}
+      <div className="bg-white p-1.5 rounded-2xl border border-luxury-200 flex flex-col sm:flex-row gap-1.5 shadow-xs print:hidden">
         <button
           onClick={() => setActiveSheet("resort")}
           className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 border ${
-            activeSheet === "resort"
-              ? "bg-luxury-800 text-white border-luxury-800 shadow-sm"
-              : "bg-white text-neutral-500 border-transparent hover:bg-luxury-50"
+            activeSheet === "resort" ? "bg-luxury-800 text-white border-luxury-800 shadow-sm" : "bg-white text-neutral-500 border-transparent hover:bg-luxury-50"
           }`}
         >
           <Hotel className="w-4 h-4 text-brass-500" />
-          <span>Folha Resort (Captadas no Resort)</span>
+          Folha Resort (Captadas no Resort)
         </button>
         <button
           onClick={() => setActiveSheet("google")}
           className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 border ${
-            activeSheet === "google"
-              ? "bg-luxury-800 text-white border-luxury-800 shadow-sm"
-              : "bg-white text-neutral-500 border-transparent hover:bg-luxury-50"
+            activeSheet === "google" ? "bg-luxury-800 text-white border-luxury-800 shadow-sm" : "bg-white text-neutral-500 border-transparent hover:bg-luxury-50"
           }`}
         >
           <Globe className="w-4 h-4 text-brass-500" />
-          <span>Folha Google (Reclamações do Google)</span>
+          Folha Google (Reclamações do Google)
         </button>
       </div>
 
-      {/* Date Filter Bar */}
-      <div id="dashboard-date-filters" className="bg-white rounded-2xl border border-luxury-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-neutral-500" />
-          <span className="text-sm font-semibold text-neutral-700 font-display">Período de Análise</span>
+      {/* Filter Bar: dates + sector */}
+      <div className="bg-white rounded-2xl border border-luxury-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-2 shrink-0">
+          <Filter className="w-4 h-4 text-neutral-400" />
+          <span className="text-sm font-semibold text-neutral-700 font-display">Filtros</span>
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto">
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-center sm:justify-start">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap justify-center">
             <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-xs sm:text-sm rounded-xl border border-luxury-200 px-3.5 py-2 bg-luxury-50 focus:border-brass-500 font-medium outline-none cursor-pointer"
+              type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              className="text-xs sm:text-sm rounded-xl border border-luxury-200 px-3.5 py-2 bg-luxury-50 focus:border-brass-500 outline-none cursor-pointer"
             />
-            <span className="text-neutral-400 text-xs font-medium">até</span>
+            <span className="text-neutral-400 text-xs">até</span>
             <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-xs sm:text-sm rounded-xl border border-luxury-200 px-3.5 py-2 bg-luxury-50 focus:border-brass-500 font-medium outline-none cursor-pointer"
+              type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              className="text-xs sm:text-sm rounded-xl border border-luxury-200 px-3.5 py-2 bg-luxury-50 focus:border-brass-500 outline-none cursor-pointer"
             />
           </div>
-          
+          <select
+            value={selectedSector} onChange={(e) => setSelectedSector(e.target.value)}
+            className="text-xs sm:text-sm rounded-xl border border-luxury-200 px-3.5 py-2 bg-luxury-50 focus:border-brass-500 outline-none cursor-pointer font-medium"
+          >
+            {SECTORS.map(s => (
+              <option key={s} value={s}>{s === "Todos" ? "Todos os Setores" : s}</option>
+            ))}
+          </select>
           <button
             onClick={() => window.print()}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm shrink-0 border border-emerald-700 font-display"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm shrink-0"
           >
             <Printer className="w-4 h-4" />
-            Imprimir Dashboard
+            Imprimir
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div id="dashboard-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Ocorrências */}
-        <div id="kpi-card-total" className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
-          <div className="p-3.5 bg-neutral-100 text-neutral-700 rounded-xl">
-            <ClipboardList className="w-5 h-5" />
-          </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
+          <div className="p-3.5 bg-neutral-100 text-neutral-700 rounded-xl"><ClipboardList className="w-5 h-5" /></div>
           <div>
             <span className="block text-[10px] uppercase font-mono tracking-wider text-neutral-400">Total Geral</span>
             <span className="text-2xl font-bold font-display text-neutral-800">{totalCount}</span>
           </div>
         </div>
-
-        {/* Reclamações */}
-        <div id="kpi-card-complaints" className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
-          <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
+        <div className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
+          <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl"><AlertTriangle className="w-5 h-5" /></div>
           <div>
             <span className="block text-[10px] uppercase font-mono tracking-wider text-rose-400">Reclamações</span>
             <span className="text-2xl font-bold font-display text-rose-700">{complaints.length}</span>
           </div>
         </div>
-
-        {/* Feedback Positivo */}
-        <div id="kpi-card-positive" className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
-          <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <ThumbsUp className="w-5 h-5" />
-          </div>
+        <div className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
+          <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl"><ThumbsUp className="w-5 h-5" /></div>
           <div>
             <span className="block text-[10px] uppercase font-mono tracking-wider text-emerald-400">Feedbacks</span>
             <span className="text-2xl font-bold font-display text-emerald-700">{positiveFeedbacks.length}</span>
           </div>
         </div>
-
-        {/* Outro */}
-        <div id="kpi-card-other" className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
-          <div className="p-3.5 bg-neutral-50 text-neutral-600 rounded-xl">
-            <HelpCircle className="w-5 h-5" />
-          </div>
+        <div className="bg-white rounded-2xl p-5 border border-luxury-200 flex items-center gap-4">
+          <div className="p-3.5 bg-neutral-50 text-neutral-600 rounded-xl"><HelpCircle className="w-5 h-5" /></div>
           <div>
             <span className="block text-[10px] uppercase font-mono tracking-wider text-neutral-400">Outros</span>
             <span className="text-2xl font-bold font-display text-neutral-700">{extraType.length}</span>
@@ -281,204 +299,160 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* Analytics and Data Grid - COMPLAINTS */}
-      <div className="pt-4 border-t border-rose-100">
-        <h2 className="text-lg font-bold font-display text-neutral-800 flex items-center gap-2 mb-4">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-          <span>Gestão de Reclamações por Setor</span>
-        </h2>
+      {/* Charts: Complaints + Positives side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChartBar
+          data={complaintsChart}
+          label={`Reclamações por Setor (${totalComplaints})`}
+          emptyMsg="Nenhuma reclamação no período."
+          emptyIcon={ClipboardList}
+        />
+        <ChartBar
+          data={positivesChart}
+          label={`Feedbacks Positivos por Setor (${totalPositives})`}
+          emptyMsg="Nenhum feedback positivo no período."
+          emptyIcon={ThumbsUp}
+        />
       </div>
-      <div id="dashboard-analytics-grid-complaints" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Pie Chart Card */}
-        <div id="analytics-chart-card-complaints" className="bg-white rounded-2xl border border-luxury-200 p-5 lg:col-span-2 flex flex-col">
-          <h3 className="text-sm font-semibold font-display text-neutral-800 uppercase tracking-wider flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-rose-500" />
-            <span>Percentual de Reclamações por Setor</span>
-          </h3>
 
-          {totalComplaintsValue > 0 ? (
-            <div id="piechart-subcontainer-complaints" className="flex-1 min-h-[550px] flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height={550}>
-                <PieChart margin={{ top: 25, right: 120, bottom: 25, left: 120 }}>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={90}
-                    outerRadius={150}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={renderCustomizedLabel(totalComplaintsValue)}
-                    labelLine={false}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ borderRadius: "12px", border: "1px solid #e9e6dc" }}
-                    formatter={(value: any) => [`${value} reclamação(ões)`, "Volume"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              
-              {/* Centered Total Multi-Badge — verdadeiramente centralizado no contêiner */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
-                <span className="text-3xl font-extrabold font-display text-neutral-800">{totalComplaintsValue}</span>
-                <span className="text-xs font-mono text-rose-500 font-semibold uppercase">Queixas</span>
+      {/* ─── FlexSpot Ratings Section ─────────────────────────────────── */}
+      <div className="pt-2 border-t-2 border-luxury-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold font-display text-neutral-800 flex items-center gap-2">
+            <Award className="w-5 h-5 text-brass-500" />
+            Histórico de Avaliações Flexspot
+          </h2>
+          {!showClearConfirm ? (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="text-xs text-rose-500 hover:text-rose-600 font-bold uppercase tracking-wider cursor-pointer border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-50 transition-all"
+            >
+              Limpar Dados Flexspot
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-rose-600 font-semibold">Confirma limpeza?</span>
+              <button onClick={handleClearFlex} disabled={clearingFlex}
+                className="text-xs bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60 flex items-center gap-1">
+                {clearingFlex && <RefreshCw className="w-3 h-3 animate-spin" />}
+                Sim
+              </button>
+              <button onClick={() => setShowClearConfirm(false)}
+                className="text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider cursor-pointer">
+                Não
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Ratings avg KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          {[
+            { label: "Wi-Fi", avg: stats.wifiAvg, count: stats.wifiCount, icon: Wifi, color: "indigo" },
+            { label: "Alimentação", avg: stats.foodAvg, count: stats.foodCount, icon: Utensils, color: "amber" },
+            { label: "Atendimento", avg: stats.serviceAvg, count: stats.serviceCount, icon: UserCheck, color: "teal" },
+            { label: "Limpeza", avg: stats.cleanAvg, count: stats.cleanCount, icon: Star, color: "emerald" },
+            { label: "Geral", avg: stats.overallAvg, count: stats.totalResponses, icon: Award, color: "brass" },
+          ].map(({ label, avg, count, icon: Icon, color }) => {
+            const scoreColor = avg === null ? "#a3a3a3" : avg >= 4 ? "#059669" : avg >= 3 ? "#d97706" : "#dc2626";
+            return (
+              <div key={label} className="bg-white rounded-2xl p-4 border border-luxury-200 flex flex-col gap-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className="w-4 h-4 text-brass-500" />
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-neutral-400">{label}</span>
+                </div>
+                {avg !== null ? (
+                  <>
+                    <span className="text-2xl font-bold font-display" style={{ color: scoreColor }}>{avg}</span>
+                    <div className="w-full h-1.5 bg-luxury-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${(avg / 5) * 100}%`, backgroundColor: scoreColor }} />
+                    </div>
+                    <span className="text-[10px] text-neutral-400 font-mono">{count} resp.</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-neutral-300 italic">—</span>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] text-center text-neutral-400">
-              <ClipboardList className="w-12 h-12 stroke-1 mb-2 text-neutral-300" />
-              <p className="text-sm font-medium">Nenhuma reclamação registrada neste período.</p>
-              <p className="text-xs text-neutral-400 mt-1">Insira novas ocorrências ou altere as datas acima.</p>
-            </div>
-          )}
+            );
+          })}
         </div>
 
-        {/* Sector Rank Card */}
-        <div id="analytics-rank-card-complaints" className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
-          <h3 className="text-sm font-bold font-display uppercase tracking-wider text-neutral-400 mb-4">
-            Volume de Reclamações
-          </h3>
-
-          {totalComplaintsValue > 0 ? (
-            <div id="rank-sectors-list-complaints" className="space-y-4 flex-1 overflow-y-auto max-h-[500px] pr-1">
-              {chartData.map((item, index) => {
-                const pct = Math.round((item.value / totalComplaintsValue) * 100);
-                return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold text-neutral-700">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span>{item.name}</span>
-                      </div>
-                      <div className="font-mono">
-                        <span>{item.value} ({pct}%)</span>
-                      </div>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="w-full bg-luxury-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000"
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor: item.color
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+        {/* FlexSpot records table */}
+        {filteredFlex.length > 0 ? (
+          <div className="bg-white rounded-2xl border border-luxury-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs min-w-[700px]">
+                <thead className="bg-luxury-100/60 border-b border-luxury-200 font-bold text-neutral-600 font-display">
+                  <tr>
+                    <th className="py-3 px-4 w-20">Data</th>
+                    <th className="py-3 px-4 w-20">Apto</th>
+                    <th className="py-3 px-4">Comentário</th>
+                    <th className="py-3 px-4 w-28 text-center">Wi-Fi</th>
+                    <th className="py-3 px-4 w-28 text-center">Alimentação</th>
+                    <th className="py-3 px-4 w-28 text-center">Atendimento</th>
+                    <th className="py-3 px-4 w-28 text-center">Limpeza</th>
+                    <th className="py-3 px-4 w-16 text-right print:hidden">Editar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flexPage.map((occ) => (
+                    <tr key={occ.id} className="border-b border-luxury-200/50 hover:bg-luxury-50 transition-colors align-middle">
+                      <td className="py-3 px-4 font-mono font-semibold text-neutral-700 uppercase">{fmtDate(occ.date)}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-neutral-800">{occ.apartment}</td>
+                      <td className="py-3 px-4 text-neutral-600 leading-relaxed max-w-xs" title={occ.observation}>
+                        <span className="line-clamp-2">{occ.observation}</span>
+                      </td>
+                      <td className="py-3 px-4 text-center"><ScoreBar score={normalizeScore(occ.ratings?.wifi)} /></td>
+                      <td className="py-3 px-4 text-center"><ScoreBar score={normalizeScore(occ.ratings?.alimentacao)} /></td>
+                      <td className="py-3 px-4 text-center"><ScoreBar score={normalizeScore(occ.ratings?.atendimento)} /></td>
+                      <td className="py-3 px-4 text-center"><ScoreBar score={normalizeScore(occ.ratings?.limpeza)} /></td>
+                      <td className="py-3 px-4 text-right print:hidden">
+                        <button
+                          onClick={() => onEditRequested(occ)}
+                          className="p-1.5 hover:bg-neutral-100 text-neutral-500 hover:text-neutral-800 rounded-lg cursor-pointer transition-colors"
+                          title="Editar comentário"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-400">
-              <span className="text-xs">Aguardando dados...</span>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Analytics and Data Grid - POSITIVE REVIEWS */}
-      <div className="pt-8 border-t border-emerald-100">
-        <h2 className="text-lg font-bold font-display text-neutral-800 flex items-center gap-2 mb-4">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Gestão de Feedbacks Positivos por Setor</span>
-        </h2>
-      </div>
-      <div id="dashboard-analytics-grid-positive" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Pie Chart Card */}
-        <div id="analytics-chart-card-positive" className="bg-white rounded-2xl border border-luxury-200 p-5 lg:col-span-2 flex flex-col">
-          <h3 className="text-sm font-semibold font-display text-neutral-800 uppercase tracking-wider flex items-center gap-2 mb-4">
-            <ThumbsUp className="w-4 h-4 text-emerald-600" />
-            <span>Distribuição de Elogios por Setor</span>
-          </h3>
-
-          {totalPositiveValue > 0 ? (
-            <div id="piechart-subcontainer-positive" className="flex-1 min-h-[550px] flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height={550}>
-                <PieChart margin={{ top: 25, right: 120, bottom: 25, left: 120 }}>
-                  <Pie
-                    data={positiveChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={90}
-                    outerRadius={150}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={renderCustomizedLabel(totalPositiveValue)}
-                    labelLine={false}
+            {/* Pagination */}
+            {flexTotalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-luxury-200 text-xs">
+                <span className="text-neutral-400 font-mono">
+                  {filteredFlex.length} registros · pág. {flexCurrentPage}/{flexTotalPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setFlexCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={flexCurrentPage === 1}
+                    className="p-1.5 rounded-lg hover:bg-luxury-100 disabled:opacity-30 cursor-pointer"
                   >
-                    {positiveChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ borderRadius: "12px", border: "1px solid #e9e6dc" }}
-                    formatter={(value: any) => [`${value} feedback(s) positivo(s)`, "Volume"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              
-              {/* Centered Total Multi-Badge — verdadeiramente centralizado no contêiner */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-sm text-neutral-400 uppercase font-mono tracking-wide">Total</span>
-                <span className="text-3xl font-extrabold font-display text-neutral-800">{totalPositiveValue}</span>
-                <span className="text-xs font-mono text-emerald-600 font-semibold uppercase">Elogios</span>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setFlexCurrentPage(p => Math.min(flexTotalPages, p + 1))}
+                    disabled={flexCurrentPage === flexTotalPages}
+                    className="p-1.5 rounded-lg hover:bg-luxury-100 disabled:opacity-30 cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[250px] text-center text-neutral-400">
-              <ThumbsUp className="w-12 h-12 stroke-1 mb-2 text-neutral-300" />
-              <p className="text-sm font-medium">Nenhum feedback positivo registrado neste período.</p>
-              <p className="text-xs text-neutral-400 mt-1">Insira novas avaliações positivas ou altere as datas acima.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sector Rank Card */}
-        <div id="analytics-rank-card-positive" className="bg-white rounded-2xl border border-luxury-200 p-5 flex flex-col">
-          <h3 className="text-sm font-bold font-display uppercase tracking-wider text-neutral-400 mb-4">
-            Volume de Elogios
-          </h3>
-
-          {totalPositiveValue > 0 ? (
-            <div id="rank-sectors-list-positive" className="space-y-4 flex-1 overflow-y-auto max-h-[500px] pr-1">
-              {positiveChartData.map((item, index) => {
-                const pct = Math.round((item.value / totalPositiveValue) * 100);
-                return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold text-neutral-700">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span>{item.name}</span>
-                      </div>
-                      <div className="font-mono">
-                        <span>{item.value} ({pct}%)</span>
-                      </div>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="w-full bg-luxury-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000"
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor: item.color
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-400">
-              <span className="text-xs">Aguardando dados...</span>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-neutral-400 text-xs border border-dashed border-luxury-200 rounded-2xl bg-luxury-50">
+            <Award className="w-10 h-10 stroke-1 text-neutral-300 mx-auto mb-2" />
+            <p className="font-semibold text-neutral-500">Nenhuma avaliação Flexspot no período selecionado.</p>
+            <p className="text-xs mt-1">Importe um CSV do Flexspot para ver as médias aqui.</p>
+          </div>
+        )}
       </div>
     </div>
   );
