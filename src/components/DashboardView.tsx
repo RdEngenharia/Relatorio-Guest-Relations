@@ -16,6 +16,7 @@ import OccurrenceForm from "./OccurrenceForm";
 interface DashboardViewProps {
   occurrences: Occurrence[];
   onClearFlexspotData?: () => Promise<void>;
+  onClearAllData?: () => Promise<void>;
 }
 
 // ── Ícones e cores por setor ──
@@ -69,7 +70,7 @@ const normalizeScore = (v: any): number | null => {
 
 const ITEMS_PER_PAGE = 12;
 
-export default function DashboardView({ occurrences, onClearFlexspotData }: DashboardViewProps) {
+export default function DashboardView({ occurrences, onClearFlexspotData, onClearAllData }: DashboardViewProps) {
   const getInitialStartDate = () => { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; };
   const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -83,6 +84,8 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
   const [isDeleting, setIsDeleting]         = useState(false);
   const [clearingFlexspot, setClearingFlexspot] = useState(false);
   const [showClearFlexspot, setShowClearFlexspot] = useState(false);
+  const [clearingAll, setClearingAll]       = useState(false);
+  const [showClearAll, setShowClearAll]     = useState(false);
 
   useEffect(() => { setCurrentPage(1); }, [startDate, endDate, search]);
 
@@ -168,6 +171,12 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
     setClearingFlexspot(true);
     try { await onClearFlexspotData?.(); }
     finally { setClearingFlexspot(false); setShowClearFlexspot(false); }
+  };
+
+  const confirmClearAll = async () => {
+    setClearingAll(true);
+    try { await onClearAllData?.(); }
+    finally { setClearingAll(false); setShowClearAll(false); }
   };
 
   const periodStr = `${startDate.split("-").reverse().join("/")} até ${endDate.split("-").reverse().join("/")}`;
@@ -345,7 +354,13 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
                 {onClearFlexspotData && (
                   <button onClick={() => setShowClearFlexspot(true)}
                     className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all cursor-pointer uppercase tracking-wider">
-                    <Trash className="w-3 h-3" /> Limpar
+                    <Trash className="w-3 h-3" /> Limpar Flexspot
+                  </button>
+                )}
+                {onClearAllData && (
+                  <button onClick={() => setShowClearAll(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-rose-700 hover:text-rose-900 hover:bg-rose-100 rounded-lg transition-all cursor-pointer uppercase tracking-wider border border-rose-200">
+                    <Trash className="w-3 h-3" /> Limpar Tudo
                   </button>
                 )}
               </div>
@@ -551,6 +566,17 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
         loadingLabel="Excluindo..."
         onConfirm={confirmClearFlexspot}
         onCancel={() => setShowClearFlexspot(false)}
+      />
+      <ConfirmDialog
+        open={showClearAll}
+        title="Limpar TODOS os registros"
+        description="Esta ação apaga absolutamente tudo e não pode ser desfeita."
+        message={<>Todos os <strong>{occurrences.length} registros</strong> do banco serão excluídos permanentemente, incluindo registros fora do período selecionado.</>}
+        confirmLabel="Sim, apagar tudo"
+        loading={clearingAll}
+        loadingLabel="Excluindo em lote..."
+        onConfirm={confirmClearAll}
+        onCancel={() => setShowClearAll(false)}
       />
     </div>
   );
