@@ -83,7 +83,6 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
   const [isDeleting, setIsDeleting]         = useState(false);
   const [clearingFlexspot, setClearingFlexspot] = useState(false);
   const [showClearFlexspot, setShowClearFlexspot] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setCurrentPage(1); }, [startDate, endDate, search]);
 
