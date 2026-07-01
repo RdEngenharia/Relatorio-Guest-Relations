@@ -247,7 +247,7 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
       <body><h1>${title}</h1><p>Período: ${periodStr} • ${list.length} comentário(s)</p>
       ${rows || "<p>Nenhum comentário encontrado.</p>"}</body></html>`;
     const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); w.print(); }
+    if (w) { w.document.write(html); w.document.close(); w.print(); w.close(); }
     setPrintSectorModal(false);
   };
 
