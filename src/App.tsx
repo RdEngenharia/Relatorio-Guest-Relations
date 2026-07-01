@@ -1,28 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { auth, db, logoutUser } from "./firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, onSnapshot, doc, getDocFromServer, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDocFromServer, writeBatch } from "firebase/firestore";
 import { Occurrence } from "./types";
 
 // Inner Components
 import AuthScreen from "./components/AuthScreen";
-import OccurrenceForm from "./components/OccurrenceForm";
 import DashboardView from "./components/DashboardView";
-import OccurrencesList from "./components/OccurrencesList";
 import CsvImporter from "./components/CsvImporter";
+import RatingsDashboard from "./components/RatingsDashboard";
 
 // Icons
-import { LayoutDashboard, PlusCircle, FileSpreadsheet, LogOut, Hotel, UserCheck, Upload } from "lucide-react";
+import { LayoutDashboard, Upload, LogOut, Hotel, Sparkles, UserCheck, Award } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "list" | "form" | "import">("dashboard");
-  const [editingOccurrence, setEditingOccurrence] = useState<Occurrence | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "import" | "ratings">("dashboard");
 
-  // Firestore connection checker mandated by Firebase Skill instructions
+  // Firestore connection test
   useEffect(() => {
     async function testConnection() {
       try {
@@ -36,7 +34,6 @@ export default function App() {
     testConnection();
   }, []);
 
-  // Listen to Authentication State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
@@ -45,13 +42,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync occurrences list dynamically only when authenticated
   useEffect(() => {
     if (!user) {
       setOccurrences([]);
       return;
     }
-
     const unsubscribe = onSnapshot(
       collection(db, "occurrences"),
       (snapshot) => {
@@ -65,7 +60,6 @@ export default function App() {
         console.error("Erro na leitura de ocorrências:", error);
       }
     );
-
     return () => unsubscribe();
   }, [user]);
 
@@ -78,29 +72,9 @@ export default function App() {
     }
   };
 
-  const handleEditRequest = (occ: Occurrence) => {
-    setEditingOccurrence(occ);
-    setActiveTab("form");
-  };
-
-  const handleSaveFinished = () => {
-    setEditingOccurrence(null);
-    setActiveTab("dashboard");
-  };
-
-  const handleCancelEdit = () => {
-    setEditingOccurrence(null);
-    setActiveTab("dashboard");
-  };
-
   const handleClearFlexspotData = async () => {
     const flexspotOccs = occurrences.filter(
-      (occ) => occ.ratings && (
-        occ.ratings.wifi !== null ||
-        occ.ratings.alimentacao !== null ||
-        occ.ratings.atendimento !== null ||
-        occ.ratings.limpeza !== null
-      )
+      (occ) => occ.ratings && Object.values(occ.ratings).some((v) => v !== null && v !== undefined)
     );
     if (flexspotOccs.length === 0) return;
     const batch = writeBatch(db);
@@ -121,17 +95,15 @@ export default function App() {
     );
   }
 
-  // Auth Gate
   if (!user) {
     return <AuthScreen onLoginSuccess={() => {}} />;
   }
 
   return (
     <div id="guest-relations-app" className="min-h-screen flex flex-col bg-luxury-100/60 pb-12">
-      {/* Premium Header Layout */}
+      {/* Header */}
       <header id="app-header" className="bg-luxury-800 text-white border-b border-luxury-900 shadow-md sticky top-0 z-55 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          
           <div className="flex items-center gap-2.5">
             <div className="p-2 sm:p-2.5 bg-neutral-900 border border-luxury-200/20 rounded-xl text-brass-500">
               <Hotel className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -141,12 +113,11 @@ export default function App() {
                 GUEST RELATIONS CONSOLE
               </h1>
               <p className="hidden sm:block text-[10px] text-neutral-400 font-serif tracking-wider">
-                Reserva • Acomodação • Ocorrência Diária • Síntese Analítica
+                Reserva • Acomodação • Avaliações • Síntese Analítica
               </p>
             </div>
           </div>
 
-          {/* User profile & controls */}
           <div className="flex items-center gap-3">
             <div className="hidden md:flex flex-col text-right">
               <span className="text-[11px] font-bold text-neutral-100 line-clamp-1">{user.displayName || user.email}</span>
@@ -180,11 +151,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Navigation tabs */}
+      {/* Navegação — simplificada: Dashboard | Satisfação Flexspot | Importar */}
       <nav id="app-navigation" className="bg-white border-b border-luxury-200 py-3 px-4 print:hidden shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center overflow-x-auto gap-2 pr-4 pl-1">
           <button
-            onClick={() => { setActiveTab("dashboard"); setEditingOccurrence(null); }}
+            onClick={() => setActiveTab("dashboard")}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
               activeTab === "dashboard"
                 ? "bg-luxury-800 text-white shadow-xs"
@@ -196,31 +167,19 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => { setActiveTab("list"); setEditingOccurrence(null); }}
+            onClick={() => setActiveTab("ratings")}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
-              activeTab === "list"
+              activeTab === "ratings"
                 ? "bg-luxury-800 text-white shadow-xs"
                 : "text-neutral-500 hover:bg-luxury-100"
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4 text-brass-500" />
-            Histórico Diário
+            <Award className="w-4 h-4 text-brass-500" />
+            Satisfação Flexspot
           </button>
 
           <button
-            onClick={() => { setActiveTab("form"); }}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
-              activeTab === "form"
-                ? "bg-luxury-800 text-white shadow-xs"
-                : "text-neutral-500 hover:bg-luxury-100"
-            }`}
-          >
-            <PlusCircle className="w-4 h-4 text-brass-500" />
-            {editingOccurrence ? "Editar Ocorrência" : "Lançar Ocorrência"}
-          </button>
-
-          <button
-            onClick={() => { setActiveTab("import"); setEditingOccurrence(null); }}
+            onClick={() => setActiveTab("import")}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer select-none shrink-0 ${
               activeTab === "import"
                 ? "bg-luxury-800 text-white shadow-xs"
@@ -233,7 +192,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Main Container Area */}
+      {/* Conteúdo principal */}
       <main id="app-main-content" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
         <AnimatePresence mode="wait">
           {activeTab === "dashboard" && (
@@ -244,44 +203,19 @@ export default function App() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <DashboardView
-                occurrences={occurrences}
-                onEditRequested={handleEditRequest}
-                onClearFlexspotData={handleClearFlexspotData}
-              />
+              <DashboardView occurrences={occurrences} />
             </motion.div>
           )}
 
-          {activeTab === "list" && (
+          {activeTab === "ratings" && (
             <motion.div
-              key="list"
+              key="ratings"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <OccurrencesList
-                occurrences={occurrences}
-                onEditRequested={handleEditRequest}
-                onDeleteSuccess={() => {}}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === "form" && (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="max-w-3xl mx-auto"
-            >
-              <OccurrenceForm
-                editingOccurrence={editingOccurrence}
-                onSaveFinished={handleSaveFinished}
-                onCancelEdit={handleCancelEdit}
-              />
+              <RatingsDashboard occurrences={occurrences} onClearData={handleClearFlexspotData} />
             </motion.div>
           )}
 
@@ -295,8 +229,8 @@ export default function App() {
               className="max-w-4xl mx-auto"
             >
               <CsvImporter
-                onImportFinished={() => setActiveTab("list")}
-                onCancel={() => setActiveTab("list")}
+                onImportFinished={() => setActiveTab("dashboard")}
+                onCancel={() => setActiveTab("dashboard")}
               />
             </motion.div>
           )}
