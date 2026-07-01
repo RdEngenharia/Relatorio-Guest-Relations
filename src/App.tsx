@@ -44,14 +44,28 @@ export default function App() {
     try { await logoutUser(); setUser(null); } catch (e) { console.error(e); }
   };
 
+  // Apaga em batches de 400 (limite Firestore é 500 por batch)
+  const deleteinBatches = async (ids: string[]) => {
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      ids.slice(i, i + BATCH_SIZE).forEach(id => batch.delete(doc(db, "occurrences", id)));
+      await batch.commit();
+    }
+  };
+
   const handleClearFlexspotData = async () => {
-    const toDelete = occurrences.filter(
-      occ => occ.ratings && Object.values(occ.ratings).some(v => v !== null && v !== undefined)
-    );
-    if (!toDelete.length) return;
-    const batch = writeBatch(db);
-    toDelete.forEach(occ => batch.delete(doc(db, "occurrences", occ.id)));
-    await batch.commit();
+    const ids = occurrences
+      .filter(occ => occ.ratings && Object.values(occ.ratings).some(v => v !== null && v !== undefined))
+      .map(occ => occ.id);
+    if (!ids.length) return;
+    await deleteinBatches(ids);
+  };
+
+  const handleClearAllData = async () => {
+    const ids = occurrences.map(occ => occ.id);
+    if (!ids.length) return;
+    await deleteinBatches(ids);
   };
 
   if (authLoading) {
@@ -119,7 +133,7 @@ export default function App() {
         <AnimatePresence mode="wait">
           {activeTab === "dashboard" && (
             <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-              <DashboardView occurrences={occurrences} onClearFlexspotData={handleClearFlexspotData} />
+              <DashboardView occurrences={occurrences} onClearFlexspotData={handleClearFlexspotData} onClearAllData={handleClearAllData} />
             </motion.div>
           )}
           {activeTab === "import" && (
