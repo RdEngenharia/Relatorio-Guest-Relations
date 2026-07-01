@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Occurrence } from "../types";
-import { Sparkles, Save, Check, RefreshCw, X } from "lucide-react";
+import { Sparkles, Save, RefreshCw, X, Utensils, Wrench, Wifi, Target, Hammer, ConciergeBell, Star, Ticket, FileText } from "lucide-react";
 import { motion } from "motion/react";
 
 interface OccurrenceFormProps {
@@ -12,20 +12,26 @@ interface OccurrenceFormProps {
 }
 
 const SECTORS = [
-  "AeB",
-  "Estrutura",
-  "TI",
-  "Lazer",
-  "Manutenção",
-  "Governança",
-  "Recepção",
-  "All inclusive",
-  "Wifi",
-  "Programações",
-  "Outro"
+  "AeB", "Estrutura", "TI", "Lazer", "Manutenção",
+  "Governança", "Recepção", "All inclusive", "Wifi", "Programações", "Outro"
 ];
 
 const OCCURRENCE_TYPES = ["Reclamação", "Feedback positivo", "Outro"];
+
+// Ícone e emoji representativo por setor, para facilitar identificação visual
+const SECTOR_META: Record<string, { emoji: string; icon: React.ReactNode }> = {
+  "AeB":          { emoji: "🍽",  icon: <Utensils className="w-4 h-4" /> },
+  "Estrutura":    { emoji: "🔧", icon: <Wrench className="w-4 h-4" /> },
+  "TI":           { emoji: "💻", icon: <Wifi className="w-4 h-4" /> },
+  "Lazer":        { emoji: "🎯", icon: <Target className="w-4 h-4" /> },
+  "Manutenção":   { emoji: "🔨", icon: <Hammer className="w-4 h-4" /> },
+  "Governança":   { emoji: "✨", icon: <Sparkles className="w-4 h-4" /> },
+  "Recepção":     { emoji: "🛎", icon: <ConciergeBell className="w-4 h-4" /> },
+  "All inclusive":{ emoji: "⭐", icon: <Star className="w-4 h-4" /> },
+  "Wifi":         { emoji: "📶", icon: <Wifi className="w-4 h-4" /> },
+  "Programações": { emoji: "🎪", icon: <Ticket className="w-4 h-4" /> },
+  "Outro":        { emoji: "📋", icon: <FileText className="w-4 h-4" /> },
+};
 
 export default function OccurrenceForm({
   editingOccurrence,
@@ -142,7 +148,7 @@ export default function OccurrenceForm({
     setNotification(null);
 
     const docId = editingOccurrence ? editingOccurrence.id : `occ_${Date.now()}`;
-    const payload: Record<string, unknown> = {
+    const payload = {
       date,
       bookingNumber: finalBooking,
       apartment: finalApartment,
@@ -153,10 +159,6 @@ export default function OccurrenceForm({
       createdAt: editingOccurrence ? editingOccurrence.createdAt : serverTimestamp(),
       updatedAt: serverTimestamp()
     };
-
-    if (editingOccurrence?.ratings) {
-      payload.ratings = editingOccurrence.ratings;
-    }
 
     try {
       await setDoc(doc(db, "occurrences", docId), payload);
@@ -205,7 +207,7 @@ export default function OccurrenceForm({
       )}
 
       <h3 className="text-base font-semibold font-display text-neutral-800 flex items-center gap-2 mb-6">
-        <span>{editingOccurrence ? "Atualizar Ocorrência" : "Novo Registro Diário"}</span>
+        <span>{editingOccurrence ? "Editar Avaliação" : "Nova Avaliação"}</span>
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -315,20 +317,29 @@ export default function OccurrenceForm({
           </div>
 
           <div id="form-field-sector">
-            <label className="block text-xs font-medium text-neutral-500 mb-1.5 uppercase tracking-wider">
-              Setor de Reclamação / Categoria *
+            <label className="block text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wider">
+              Setor / Categoria *
             </label>
-            <select
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              className="w-full text-sm rounded-xl border border-luxury-200 bg-luxury-50 px-3.5 py-2.5 focus:border-brass-500 focus:ring-1 focus:ring-brass-500 transition-all outline-none cursor-pointer"
-            >
-              {SECTORS.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
-                </option>
-              ))}
-            </select>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {SECTORS.map((sec) => {
+                const meta = SECTOR_META[sec] || { emoji: "📋", icon: <FileText className="w-4 h-4" /> };
+                return (
+                  <button
+                    key={sec}
+                    type="button"
+                    onClick={() => setSector(sec)}
+                    className={`flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${
+                      sector === sec
+                        ? "bg-luxury-800 text-white border-luxury-800 shadow-sm"
+                        : "bg-white text-neutral-600 border-luxury-200 hover:bg-luxury-50 hover:border-luxury-300"
+                    }`}
+                  >
+                    <span className="text-base">{meta.emoji}</span>
+                    <span className="text-[10px] leading-tight">{sec}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -402,7 +413,7 @@ export default function OccurrenceForm({
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            {submitLoading ? "Gravando..." : editingOccurrence ? "Salvar Alterações" : "Salvar Registro"}
+            {submitLoading ? "Gravando..." : editingOccurrence ? "Salvar Alterações" : "Salvar Avaliação"}
           </button>
         </div>
       </form>
