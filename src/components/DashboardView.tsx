@@ -218,13 +218,14 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
 
   return (
     <div id="dashboard-view-panel" className="space-y-6">
-      {/* Print header */}
+      {/* Print header — específico por aba ativa */}
       <div className="hidden print:block mb-6 border-b-2 border-luxury-800 pb-5">
         <h1 className="text-xl font-extrabold text-neutral-900 font-display uppercase tracking-wider">
-          RELATÓRIO DE SÍNTESE ANALÍTICA
+          {activeTab === "avaliacoes" ? "LISTA DE AVALIAÇÕES" : "RELATÓRIO DE SÍNTESE ANALÍTICA"}
         </h1>
         <p className="text-[11px] text-neutral-500 font-serif italic mt-0.5">
           Período: {startDate?.split("-").reverse().join("/")} até {endDate?.split("-").reverse().join("/")}
+          {activeTab === "graficos" && ` • ${activeSheet === "google" ? "Google Reviews" : "Resort"}`}
         </p>
       </div>
 
@@ -306,8 +307,11 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
       </div>
 
       {/* ── ABA: GRÁFICOS ── */}
-      {activeTab === "graficos" && (
-        <div className="space-y-8">
+      <div
+        id="dashboard-tab-graficos"
+        data-tab-active={activeTab === "graficos"}
+        className={activeTab === "graficos" ? "space-y-8" : "hidden print:hidden"}
+      >
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
@@ -409,14 +413,16 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* ── ABA: LISTA DE AVALIAÇÕES ── */}
-      {activeTab === "avaliacoes" && (
-        <div className="space-y-4">
+      <div
+        id="dashboard-tab-avaliacoes"
+        data-tab-active={activeTab === "avaliacoes"}
+        className={activeTab === "avaliacoes" ? "space-y-4" : "hidden print:hidden"}
+      >
           {/* Barra de busca + botão nova avaliação */}
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center print:hidden">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
               <input
@@ -561,12 +567,14 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
               </button>
             </div>
           )}
-        </div>
-      )}
+      </div>
 
-      {/* ── ABA: NOVA / EDITAR AVALIAÇÃO ── */}
-      {activeTab === "nova" && (
-        <div className="max-w-3xl mx-auto">
+      {/* ── ABA: NOVA / EDITAR AVALIAÇÃO — sempre oculta na impressão ── */}
+      <div
+        id="dashboard-tab-nova"
+        data-tab-active={activeTab === "nova"}
+        className={activeTab === "nova" ? "max-w-3xl mx-auto print:hidden" : "hidden print:hidden"}
+      >
           {editingOccurrence && (
             <div className="mb-4 p-3 bg-brass-500/10 border border-brass-200/50 rounded-xl flex items-center gap-3">
               <Pencil className="w-4 h-4 text-brass-600 shrink-0" />
@@ -586,8 +594,7 @@ export default function DashboardView({ occurrences }: DashboardViewProps) {
             onSaveFinished={handleSaveFinished}
             onCancelEdit={() => { setEditingOccurrence(null); setActiveTab("avaliacoes"); }}
           />
-        </div>
-      )}
+      </div>
 
       {/* Modal de confirmação de exclusão */}
       <ConfirmDialog
