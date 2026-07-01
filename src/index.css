@@ -353,4 +353,12 @@ h1, h2, h3, h4, h5, h6 {
   #flexspot-tab-lista[data-tab-active="false"] {
     display: none !important;
   }
+
+  /* Mesma proteção para as abas internas do Dashboard principal */
+  #dashboard-tab-graficos[data-tab-active="false"],
+  #dashboard-tab-avaliacoes[data-tab-active="false"],
+  #dashboard-tab-nova[data-tab-active="false"],
+  #dashboard-tab-nova[data-tab-active="true"] {
+    display: none !important;
+  }
 }
