@@ -1,8 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Occurrence } from "../types";
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell
-} from "recharts";
 import {
   Calendar, Printer, Search, Pencil, Trash2,
   Utensils, Wrench, Wifi, Target, Hammer, Sparkles,
@@ -152,6 +149,14 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
   const totalPages       = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
   const pagedOccurrences = filteredList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  const [printSectorModal, setPrintSectorModal] = useState(false);
+  const [selectedSector, setSelectedSector]     = useState<string>("todos");
+
+  // ── Lista de setores disponíveis no período ──
+  const availableSectors = useMemo(() =>
+    Array.from(new Set(allInPeriod.map(o => o.sector).filter(Boolean))).sort()
+  , [allInPeriod]);
+
   const confirmDelete = async () => {
     if (!deletingId) return;
     setIsDeleting(true);
@@ -166,54 +171,86 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
     finally { setClearingFlexspot(false); setShowClearFlexspot(false); }
   };
 
-  // ── Imprime só os comentários (abre uma janela separada) ──
-  const handlePrintComments = () => {
-    const sorted = [...allInPeriod].sort((a, b) => b.date.localeCompare(a.date));
-    const periodStr = `${startDate.split("-").reverse().join("/")} até ${endDate.split("-").reverse().join("/")}`;
-    const rows = sorted
-      .filter(o => o.observation && o.observation.trim())
-      .map(o => `
-        <div style="padding:12px 0; border-bottom:1px solid #e5e7eb;">
-          <div style="font-size:10px; color:#6b7280; font-family:monospace; margin-bottom:4px;">
-            Apto ${o.apartment} &bull; ${o.bookingNumber} &bull; ${o.date}
-            ${o.occurrenceType === "Reclamação" ? '<span style="color:#ef4444;font-weight:700;"> • Reclamação</span>' : '<span style="color:#10b981;font-weight:700;"> • Feedback positivo</span>'}
-          </div>
-          <div style="font-size:12px; color:#374151; line-height:1.6;">${o.observation}</div>
-        </div>
-      `).join("");
+  const periodStr = `${startDate.split("-").reverse().join("/")} até ${endDate.split("-").reverse().join("/")}`;
 
-    const html = `<!DOCTYPE html><html><head><title>Comentários</title>
-      <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;}h1{font-size:16px;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:4px;}p{font-size:11px;color:#6b7280;margin-bottom:24px;}</style>
-      </head><body>
-      <h1>COMENTÁRIOS DAS AVALIAÇÕES</h1>
-      <p>Período: ${periodStr} • ${sorted.length} avaliações</p>
-      ${rows}
-      </body></html>`;
-
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); w.print(); }
-  };
-
-  // ── Rótulos do BarChart vertical (impressão) ──
-  const PrintBarLabel = (props: any) => {
-    const { x, y, width, value } = props;
-    if (!value) return null;
-    return <text x={x + width / 2} y={y - 5} textAnchor="middle" fill="#374151" fontSize={10} fontWeight={700}>{value}</text>;
-  };
-
-  const PrintXAxisTick = (props: any) => {
-    const { x, y, payload } = props;
-    const words = String(payload.value).split(" ");
+  // ── Gráfico de barras verticais em SVG PURO (sem Recharts) ──
+  // Recharts usa ResizeObserver que colapsa no @media print do navegador.
+  // SVG inline é sempre renderizado corretamente na impressão.
+  const buildSVGChart = (data: { name: string; value: number | null; color: string }[]) => {
+    const W = 720, H = 280, PAD_L = 28, PAD_B = 72, PAD_T = 30, PAD_R = 8;
+    const cW = W - PAD_L - PAD_R;
+    const cH = H - PAD_B - PAD_T;
+    const barW = Math.min(42, (cW / data.length) - 5);
+    const maxVal = 5;
     return (
-      <g transform={`translate(${x},${y})`}>
-        {words.map((w: string, i: number) => (
-          <text key={i} x={0} dy={13 + i * 11} textAnchor="middle" fill="#6b7280" fontSize={9} fontWeight={600}>{w}</text>
-        ))}
-      </g>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" xmlns="http://www.w3.org/2000/svg">
+        {/* Grade horizontal */}
+        {[1,2,3,4,5].map(tick => {
+          const y = PAD_T + cH - (tick / maxVal) * cH;
+          return (
+            <g key={tick}>
+              <line x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} stroke="#e5e7eb" strokeWidth={0.8} />
+              <text x={PAD_L - 4} y={y + 3.5} textAnchor="end" fontSize={9} fill="#9ca3af">{tick}</text>
+            </g>
+          );
+        })}
+        {/* Eixo X */}
+        <line x1={PAD_L} x2={W - PAD_R} y1={PAD_T + cH} y2={PAD_T + cH} stroke="#d1d5db" strokeWidth={1} />
+        {/* Barras */}
+        {data.map((item, i) => {
+          const slotW = cW / data.length;
+          const x = PAD_L + slotW * i + (slotW - barW) / 2;
+          const val = item.value ?? 0;
+          const bH = (val / maxVal) * cH;
+          const y = PAD_T + cH - bH;
+          const words = item.name.split(" ");
+          const lines: string[] = [];
+          let cur = "";
+          words.forEach(w => {
+            if (cur && (cur + " " + w).length > 10) { lines.push(cur); cur = w; }
+            else { cur = cur ? cur + " " + w : w; }
+          });
+          if (cur) lines.push(cur);
+          return (
+            <g key={item.name}>
+              <rect x={x} y={y} width={barW} height={Math.max(bH, 1)} fill={item.color} rx={3} />
+              <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize={10} fontWeight="700" fill="#1f2937">{val}</text>
+              {lines.map((line, li) => (
+                <text key={li} x={x + barW / 2} y={PAD_T + cH + 14 + li * 11} textAnchor="middle" fontSize={9} fontWeight="600" fill="#6b7280">{line}</text>
+              ))}
+            </g>
+          );
+        })}
+      </svg>
     );
   };
 
-  const periodStr = `${startDate.split("-").reverse().join("/")} até ${endDate.split("-").reverse().join("/")}`;
+  // ── Imprime comentários numa janela separada (por setor ou todos) ──
+  const handlePrintCommentsBySector = (sector: string) => {
+    const list = [...allInPeriod]
+      .filter(o => sector === "todos" || o.sector === sector)
+      .filter(o => o.observation?.trim())
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const title = sector === "todos" ? "COMENTÁRIOS DAS AVALIAÇÕES" : `COMENTÁRIOS — ${sector.toUpperCase()}`;
+    const rows = list.map(o => `
+      <div style="padding:12px 0;border-bottom:1px solid #e5e7eb;page-break-inside:avoid;">
+        <div style="font-size:10px;color:#6b7280;font-family:monospace;margin-bottom:4px;">
+          Apto ${o.apartment} &bull; ${o.bookingNumber} &bull; ${o.date}
+          ${o.occurrenceType === "Reclamação" ? '<span style="color:#ef4444;font-weight:700;"> • Reclamação</span>' : '<span style="color:#10b981;font-weight:700;"> • Feedback positivo</span>'}
+          &bull; ${o.sector}
+        </div>
+        <div style="font-size:12px;color:#374151;line-height:1.6;">${o.observation}</div>
+      </div>`).join("");
+    const html = `<!DOCTYPE html><html><head><title>${title}</title>
+      <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;}
+      h1{font-size:15px;border-bottom:2px solid #111;padding-bottom:8px;}
+      p{font-size:11px;color:#6b7280;margin-bottom:20px;}</style></head>
+      <body><h1>${title}</h1><p>Período: ${periodStr} • ${list.length} comentário(s)</p>
+      ${rows || "<p>Nenhum comentário encontrado.</p>"}</body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); w.print(); }
+    setPrintSectorModal(false);
+  };
 
   return (
     <div id="dashboard-view-panel" className="space-y-6">
@@ -239,7 +276,7 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
             <Printer className="w-3.5 h-3.5" /> Imprimir Gráficos
           </button>
-          <button onClick={handlePrintComments}
+          <button onClick={() => setPrintSectorModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
             <MessageSquare className="w-3.5 h-3.5" /> Imprimir Comentários
           </button>
@@ -341,22 +378,13 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
             </div>
           </div>
 
-          {/* Barras VERTICAIS — apenas na impressão PDF */}
+          {/* Gráfico SVG PURO — apenas na impressão (Recharts não renderiza no @media print) */}
           <div className="hidden print:block bg-white rounded-xl border border-neutral-200 p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800 mb-6 flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" /> Médias por Categoria — Escala 1 a 5
             </h3>
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={flexspotStats.barData} margin={{ top: 24, right: 8, left: 0, bottom: 64 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f0e9" vertical={false} />
-                <XAxis dataKey="name" tick={<PrintXAxisTick />} interval={0} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 5]} allowDecimals ticks={[1,2,3,4,5]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#9ca3af" }} />
-                <Tooltip formatter={(v: any) => [`${v}/5`, "Média"]} />
-                <Bar dataKey="value" radius={[6,6,0,0]} label={<PrintBarLabel />}>
-                  {flexspotStats.barData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <p className="text-xs text-neutral-400 mb-5">Período: {periodStr} • {flexspotStats.total} avaliações • Nota geral: {flexspotStats.overall ?? "—"}/5</p>
+            {buildSVGChart(flexspotStats.barData)}
           </div>
         </>
       )}
@@ -465,7 +493,44 @@ export default function DashboardView({ occurrences, onClearFlexspotData }: Dash
         </div>
       )}
 
-      {/* Modais */}
+      {/* ── Modal de impressão de comentários por setor ── */}
+      {printSectorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-2xl shadow-xl border border-luxury-200/60 p-6 max-w-sm w-full mx-4">
+            <h3 className="text-sm font-extrabold text-neutral-800 font-display mb-1">Imprimir Comentários</h3>
+            <p className="text-xs text-neutral-500 mb-4">Selecione o setor ou imprima todos de uma vez.</p>
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              <button
+                onClick={() => handlePrintCommentsBySector("todos")}
+                className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold bg-luxury-800 text-white hover:bg-neutral-900 transition-all cursor-pointer"
+              >
+                📋 Todos os comentários ({allInPeriod.filter(o => o.observation?.trim()).length})
+              </button>
+              {availableSectors.map(sector => {
+                const count = allInPeriod.filter(o => o.sector === sector && o.observation?.trim()).length;
+                return (
+                  <button key={sector}
+                    onClick={() => handlePrintCommentsBySector(sector)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold bg-luxury-50 hover:bg-luxury-100 text-luxury-800 border border-luxury-200 transition-all cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      {SECTOR_ICONS[sector] || <FileText className="w-4 h-4" />}
+                      {sector}
+                    </span>
+                    <span className="text-neutral-400 font-mono text-[10px]">{count} coment.</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setPrintSectorModal(false)}
+              className="mt-4 w-full px-4 py-2 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modais de confirmação */}
       <ConfirmDialog
         open={deletingId !== null}
         title="Excluir registro"
