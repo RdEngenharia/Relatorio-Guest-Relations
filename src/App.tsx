@@ -7,8 +7,9 @@ import { Occurrence } from "./types";
 import AuthScreen from "./components/AuthScreen";
 import DashboardView from "./components/DashboardView";
 import CsvImporter from "./components/CsvImporter";
+import HelpModal from "./components/HelpModal";
 
-import { LayoutDashboard, Upload, LogOut, Hotel, UserCheck } from "lucide-react";
+import { LayoutDashboard, Upload, LogOut, Hotel, UserCheck, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [activeTab, setActiveTab]     = useState<"dashboard" | "import">("dashboard");
+  const [showHelp, setShowHelp]       = useState(false);
 
   useEffect(() => {
     async function testConnection() {
@@ -106,6 +108,11 @@ export default function App() {
               ? <img src={user.photoURL} alt="Avatar" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-luxury-200 object-cover" />
               : <div className="w-8 h-8 rounded-full bg-brass-500 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">{String(user.displayName || user.email).charAt(0)}</div>
             }
+            <button onClick={() => setShowHelp(true)}
+              className="p-2 text-neutral-400 hover:text-brass-400 transition-colors cursor-pointer"
+              title="Manual do Sistema">
+              <HelpCircle className="w-4.5 h-4.5" />
+            </button>
             <button onClick={handleLogout} id="header-logout-btn"
               className="p-2 text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer" title="Encerrar Sessão">
               <LogOut className="w-4.5 h-4.5" />
@@ -146,6 +153,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+      <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }
