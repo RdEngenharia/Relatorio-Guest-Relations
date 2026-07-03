@@ -89,7 +89,7 @@ export default function App() {
               <Hotel className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-extrabold tracking-tight font-display text-white">GUEST RELATIONS CONSOLE</h1>
+              <h1 className="text-sm sm:text-base font-extrabold tracking-tight font-display text-white">GUEST RELATIONS CONSOLE - PSP RESORT</h1>
               <p className="hidden sm:block text-[10px] text-neutral-400 font-serif tracking-wider">
                 Reserva • Acomodação • Avaliações • Síntese Analítica
               </p>
