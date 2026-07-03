@@ -31,6 +31,7 @@ const SECTOR_ICONS: Record<string, React.ReactNode> = {
   "All inclusive": <Star className="w-4 h-4" />,
   "Wifi":          <Wifi className="w-4 h-4" />,
   "Programações":  <Ticket className="w-4 h-4" />,
+  "Geral":         <TrendingUp className="w-4 h-4" />,
   "Outro":         <FileText className="w-4 h-4" />,
 };
 
@@ -38,7 +39,7 @@ const SECTOR_COLORS: Record<string, string> = {
   "AeB": "#1c3d5a", "Estrutura": "#c59b27", "TI": "#57534e",
   "Lazer": "#0d9488", "Manutenção": "#9a3412", "Governança": "#0891b2",
   "Recepção": "#d97706", "All inclusive": "#047857", "Wifi": "#4338ca",
-  "Programações": "#8d0801", "Outro": "#78716c",
+  "Programações": "#8d0801", "Geral": "#6b7280", "Outro": "#78716c",
 };
 
 // ── 13 categorias Flexspot ──
