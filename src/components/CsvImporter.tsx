@@ -153,7 +153,9 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
         const surveyName = getVal(surveyNameIdx);
         const question = getVal(questionIdx);
         const answer = getVal(answerIdx);
-        const userName = getVal(userIdx) || "Hóspede Flexspot";
+        // Usa nome do usuário; fallback para parte do email se nome vier vazio
+        const rawUserName = getVal(userIdx);
+        const userName = rawUserName || (email ? email.split("@")[0] : "") || "Hóspede Flexspot";
 
         if (!apartment && !question) continue;
 
@@ -365,7 +367,6 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           }
         });
 
-        // Only overwrite to "Recepção" if ALL provided scores are identical AND excellent (>= 4)
         const activeScores = ratingEntries.map(([, v]) => v);
         const allIdenticalAndHigh = activeScores.length > 0 &&
                                     activeScores.every(s => s === activeScores[0]) &&
@@ -374,10 +375,22 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           sector = "Recepção";
         }
 
-        // Determine occurrence status
+        // Classificação do tipo de ocorrência:
+        // 1º critério: nota de SATISFAÇÃO GERAL do hóspede (a mais fiel à percepção dele)
+        // 2º critério (fallback): média geral de todas as notas
+        // Só classifica como Reclamação se a satisfação geral for ≤ 3,
+        // ou se não houver satisfação geral e a média das notas for ≤ 3.
         let occurrenceType = "Feedback positivo";
-        if (activeScores.length > 0 && minScore <= 3) {
-          occurrenceType = "Reclamação";
+        if (activeScores.length > 0) {
+          const satisfacaoGeral = (ratings as any)["satisfacaoGeral"];
+          if (satisfacaoGeral !== null && satisfacaoGeral !== undefined) {
+            // Usa satisfação geral como critério principal
+            if (satisfacaoGeral <= 3) occurrenceType = "Reclamação";
+          } else {
+            // Fallback: média geral de todas as notas
+            const avgScore = activeScores.reduce((a, b) => a + b, 0) / activeScores.length;
+            if (avgScore <= 3) occurrenceType = "Reclamação";
+          }
         }
 
         const occurrence: Partial<Occurrence> & { _dedupKey?: string } = {
