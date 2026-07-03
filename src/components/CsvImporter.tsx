@@ -358,7 +358,7 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           { sector: "AeB",          keywords: ["comida","restaurante","alimentação","alimento","refeição","café","jantar","almoço","buffet","bebida","bebidas","drink","cardápio","prato","cozinha","gastronomia","bar","lanche","suco","fruta","carne","peixe","doce","sobremesa"] },
           { sector: "Wifi",         keywords: ["wifi","wi-fi","internet","conexão","rede","sinal","banda larga","lento","cair","caiu","online","navegar","velocidade","fibra"] },
           { sector: "Governança",   keywords: ["limpeza","arrumação","governança","toalha","lençol","higiene","sujo","limpo","quarto arrumado","faxina","poeira","cheiro","odor"] },
-          { sector: "Estrutura",    keywords: ["estrutura","apartamento","quarto","apto","chuveiro","ar condicionado","ar-condicionado","cama","colchão","banheiro","televisão","tv","sofá","janela","porta","tomada","luz","elétrico","vazamento","goteira","encanamento","infiltração"] },
+          { sector: "Estrutura",    keywords: ["chuveiro","ar condicionado","ar-condicionado","cama","colchao","banheiro","televisao","tv","sofa","janela","porta","tomada","vazamento","goteira","encanamento","infiltracao","mobilia","mobilia","rachado","rachada","quebrado","quebrada","estrutura do apto","estrutura do apartamento"] },
           { sector: "Manutenção",   keywords: ["manutenção","quebrado","quebrada","danificado","danificada","não funciona","defeito","problema","conserto","reparo","estragado","estragada"] },
           { sector: "Lazer",        keywords: ["lazer","piscina","parque","aventura","trilha","esporte","recreação","monitor","atividade","quadra","playground","academia","spa","massagem","animação","entretenimento","show","festa","música"] },
           { sector: "Recepção",     keywords: ["recepção","recepcionista","atendimento","check-in","check-out","checkin","checkout","funcionário","funcionária","equipe","staff","colaborador","simpático","educado","gentil","grosseiro","rude","mal atendido"] },
@@ -366,7 +366,12 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           { sector: "Programações", keywords: ["programação","evento","show","apresentação","música ao vivo","festa","animação","atividade","agenda"] },
         ];
 
-        const commentLower = (commentText || "").toLowerCase()
+        // IMPORTANTE: o texto automático gerado pelo sistema ("Pesquisa de satisfação
+        // preenchida por X (Quarto Y)") não deve ser usado para detectar setor —
+        // só comentários reais do hóspede devem influenciar a classificação.
+        const isAutoText = commentText.startsWith("Pesquisa de satisfação preenchida por");
+        const commentLower = (!isAutoText ? commentText : "")
+          .toLowerCase()
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         // 1. Detecta setor pelo texto do comentário
