@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Occurrence } from "../types";
-import { Save, RefreshCw, Sparkles, Utensils, Wrench, Wifi, Target, Hammer, ConciergeBell, Star, Ticket, FileText } from "lucide-react";
+import { Save, RefreshCw, Utensils, Wrench, Wifi, Target, Hammer, Sparkles, ConciergeBell, Star, Ticket, FileText } from "lucide-react";
 import { motion } from "motion/react";
 
 interface OccurrenceFormProps {
@@ -32,6 +32,23 @@ const SECTOR_META: Record<string, { emoji: string }> = {
   "Outro":         { emoji: "📋" },
 };
 
+// 13 categorias Flexspot com label legível
+const RATING_LABELS: { key: string; label: string; color: string }[] = [
+  { key: "satisfacaoGeral",      label: "Satisfação Geral",    color: "#9333ea" },
+  { key: "atendimentoGeral",     label: "Atendimento Geral",   color: "#d97706" },
+  { key: "recepcao",             label: "Recepção",            color: "#ea580c" },
+  { key: "wifi",                 label: "Wi-Fi / Conexão",     color: "#4338ca" },
+  { key: "alimentacao",          label: "Alimentação",         color: "#1c3d5a" },
+  { key: "bebidas",              label: "Bebidas",             color: "#0369a1" },
+  { key: "boutique",             label: "Boutique",            color: "#be185d" },
+  { key: "areasSociais",         label: "Áreas Sociais",       color: "#0891b2" },
+  { key: "limpezaApartamento",   label: "Limpeza do Apto",     color: "#0e7490" },
+  { key: "estruturaApartamento", label: "Estrutura do Apto",   color: "#65a30d" },
+  { key: "equipeLazer",          label: "Equipe de Lazer",     color: "#ca8a04" },
+  { key: "estruturaLazer",       label: "Estrutura de Lazer",  color: "#16a34a" },
+  { key: "parqueAventuras",      label: "Parque de Aventuras", color: "#059669" },
+];
+
 export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCancelEdit }: OccurrenceFormProps) {
   const getTodayISOString = () => {
     const today = new Date();
@@ -39,14 +56,14 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
     return new Date(today.getTime() - offset * 60 * 1000).toISOString().split("T")[0];
   };
 
-  const [date, setDate]                   = useState(getTodayISOString());
-  const [bookingNumber, setBookingNumber] = useState("");
-  const [apartment, setApartment]         = useState("");
+  const [date, setDate]                     = useState(getTodayISOString());
+  const [bookingNumber, setBookingNumber]   = useState("");
+  const [apartment, setApartment]           = useState("");
   const [occurrenceType, setOccurrenceType] = useState("Reclamação");
-  const [sector, setSector]               = useState("AeB");
-  const [observation, setObservation]     = useState("");
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [notification, setNotification]   = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [sector, setSector]                 = useState("AeB");
+  const [observation, setObservation]       = useState("");
+  const [submitLoading, setSubmitLoading]   = useState(false);
+  const [notification, setNotification]     = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   useEffect(() => {
     if (editingOccurrence) {
@@ -82,17 +99,21 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
     setNotification(null);
 
     const docId = editingOccurrence ? editingOccurrence.id : `occ_${Date.now()}`;
-    const payload = {
+    const payload: any = {
       date,
       bookingNumber: bookingNumber.trim(),
       apartment: apartment.trim(),
       occurrenceType,
       sector,
       observation: observation.trim(),
-      source: "resort" as const,
+      source: editingOccurrence?.source || "resort",
       createdAt: editingOccurrence ? editingOccurrence.createdAt : serverTimestamp(),
       updatedAt: serverTimestamp()
     };
+
+    // Preserva ratings e generalInfo existentes ao editar
+    if (editingOccurrence?.ratings) payload.ratings = editingOccurrence.ratings;
+    if (editingOccurrence?.generalInfo) payload.generalInfo = editingOccurrence.generalInfo;
 
     try {
       await setDoc(doc(db, "occurrences", docId), payload);
@@ -110,19 +131,24 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
     }
   };
 
+  // Verifica se tem notas Flexspot para mostrar
+  const hasRatings = !!(editingOccurrence?.ratings &&
+    Object.values(editingOccurrence.ratings).some(v => v !== null && v !== undefined));
+
+  const ratingsToShow = hasRatings
+    ? RATING_LABELS.filter(r => {
+        const val = (editingOccurrence!.ratings as any)?.[r.key];
+        return val !== null && val !== undefined;
+      })
+    : [];
+
   return (
     <div id="occurrence-form-wrapper" className="bg-white rounded-2xl border border-luxury-200 shadow-sm p-6 relative">
       {editingOccurrence && (
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        <div className="absolute top-4 right-4">
           <span className="text-xs uppercase font-mono bg-brass-500/10 text-brass-600 px-2 py-1 rounded font-medium">
             Editando Registro
           </span>
-          {onCancelEdit && (
-            <button type="button" onClick={onCancelEdit}
-              className="p-1 hover:bg-luxury-100 rounded-lg cursor-pointer text-neutral-400 hover:text-neutral-600 transition-all">
-              <FileText className="w-4 h-4" />
-            </button>
-          )}
         </div>
       )}
 
@@ -151,7 +177,7 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
           </div>
         </div>
 
-        {/* Tipo de Ocorrência e Setor */}
+        {/* Tipo e Setor */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-neutral-500 mb-1.5 uppercase tracking-wider">Tipo de Ocorrência *</label>
@@ -164,7 +190,6 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
               ))}
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wider">Setor / Categoria *</label>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -181,6 +206,40 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
             </div>
           </div>
         </div>
+
+        {/* Notas Flexspot — somente leitura, visível apenas ao editar registros com pontuação */}
+        {hasRatings && (
+          <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-indigo-700 mb-3 flex items-center gap-2">
+              ⭐ Notas do Flexspot — como o hóspede avaliou cada setor
+              <span className="text-[10px] font-normal text-indigo-400 normal-case tracking-normal">(escala 1 a 5 • somente leitura)</span>
+            </p>
+            <div className="space-y-2">
+              {ratingsToShow.map(r => {
+                const val = (editingOccurrence!.ratings as any)?.[r.key] as number;
+                const pct = (val / 5) * 100;
+                const badgeClass = val >= 4 ? "text-emerald-700 bg-emerald-50" : val >= 3 ? "text-amber-700 bg-amber-50" : "text-rose-700 bg-rose-50";
+                return (
+                  <div key={r.key} className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-neutral-600 w-36 shrink-0">{r.label}</span>
+                    <div className="flex-1 bg-white h-2.5 rounded-full overflow-hidden border border-indigo-100">
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: r.color }} />
+                    </div>
+                    <span className={`text-[11px] font-black font-mono px-2 py-0.5 rounded-lg w-10 text-center shrink-0 ${badgeClass}`}>
+                      {val}/5
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {editingOccurrence?.generalInfo?.primeiraVez && (
+              <p className="text-[10px] text-indigo-500 mt-3">
+                {editingOccurrence.generalInfo.primeiraVez === "Sim" ? "🏨 Primeira hospedagem" : "🔄 Hóspede recorrente"}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Observação */}
         <div>
