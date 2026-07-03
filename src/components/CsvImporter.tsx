@@ -344,55 +344,79 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           commentText += ` (Média consolidada de ${sessions.length} respostas enviadas no mesmo dia.)`;
         }
 
-        // Determine setor de maior atenção (menor nota entre as categorias com pior cobertura de setor)
-        const SECTOR_BY_RATING_KEY: Record<string, string> = {
-          wifi: "Wifi",
-          alimentacao: "AeB",
-          bebidas: "AeB",
-          boutique: "AeB",
-          limpezaApartamento: "Governança",
-          areasSociais: "Governança",
-          atendimentoGeral: "Recepção",
-          recepcao: "Recepção",
-          equipeLazer: "Lazer",
-          estruturaLazer: "Lazer",
-          parqueAventuras: "Lazer",
-          estruturaApartamento: "Estrutura",
-          satisfacaoGeral: "Recepção"
-        };
+        // ── ATRIBUIÇÃO DE SETOR ─────────────────────────────────────────────
+        // Lógica em ordem de prioridade:
+        // 1. Texto do comentário menciona explicitamente um setor → usa esse setor
+        // 2. Alguma nota específica é ≤ 3 (ponto de atenção real) → usa o setor da pior nota
+        // 3. Nenhuma das anteriores → "Geral" (avaliação genérica sem setor identificado)
+        //
+        // Isso evita que comentários positivos genéricos sejam atribuídos a setores
+        // específicos só porque tiveram a menor nota relativa (ex: 4 vs 5).
 
-        const ratingEntries = Object.entries(ratings).filter(([, v]) => v !== undefined && v !== null) as [string, number][];
+        // Palavras-chave por setor — detectadas no texto do comentário
+        const SECTOR_KEYWORDS: { sector: string; keywords: string[] }[] = [
+          { sector: "AeB",          keywords: ["comida","restaurante","alimentação","alimento","refeição","café","jantar","almoço","buffet","bebida","bebidas","drink","cardápio","prato","cozinha","gastronomia","bar","lanche","suco","fruta","carne","peixe","doce","sobremesa"] },
+          { sector: "Wifi",         keywords: ["wifi","wi-fi","internet","conexão","rede","sinal","banda larga","lento","cair","caiu","online","navegar","velocidade","fibra"] },
+          { sector: "Governança",   keywords: ["limpeza","arrumação","governança","toalha","lençol","higiene","sujo","limpo","quarto arrumado","faxina","poeira","cheiro","odor"] },
+          { sector: "Estrutura",    keywords: ["estrutura","apartamento","quarto","apto","chuveiro","ar condicionado","ar-condicionado","cama","colchão","banheiro","televisão","tv","sofá","janela","porta","tomada","luz","elétrico","vazamento","goteira","encanamento","infiltração"] },
+          { sector: "Manutenção",   keywords: ["manutenção","quebrado","quebrada","danificado","danificada","não funciona","defeito","problema","conserto","reparo","estragado","estragada"] },
+          { sector: "Lazer",        keywords: ["lazer","piscina","parque","aventura","trilha","esporte","recreação","monitor","atividade","quadra","playground","academia","spa","massagem","animação","entretenimento","show","festa","música"] },
+          { sector: "Recepção",     keywords: ["recepção","recepcionista","atendimento","check-in","check-out","checkin","checkout","funcionário","funcionária","equipe","staff","colaborador","simpático","educado","gentil","grosseiro","rude","mal atendido"] },
+          { sector: "All inclusive", keywords: ["all inclusive","all-inclusive","tudo incluído","incluso","inclusivo","serviço completo"] },
+          { sector: "Programações", keywords: ["programação","evento","show","apresentação","música ao vivo","festa","animação","atividade","agenda"] },
+        ];
 
-        let sector = "Recepção";
-        let minScore = 11;
-        ratingEntries.forEach(([k, v]) => {
-          if (v < minScore) {
-            minScore = v;
-            sector = SECTOR_BY_RATING_KEY[k] || "Recepção";
+        const commentLower = (commentText || "").toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        // 1. Detecta setor pelo texto do comentário
+        let sector = "";
+        for (const { sector: s, keywords } of SECTOR_KEYWORDS) {
+          if (keywords.some(kw =>
+            commentLower.includes(kw.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
+          )) {
+            sector = s;
+            break;
           }
-        });
-
-        const activeScores = ratingEntries.map(([, v]) => v);
-        const allIdenticalAndHigh = activeScores.length > 0 &&
-                                    activeScores.every(s => s === activeScores[0]) &&
-                                    activeScores[0] >= 4;
-        if (allIdenticalAndHigh) {
-          sector = "Recepção";
         }
 
-        // Classificação do tipo de ocorrência:
-        // 1º critério: nota de SATISFAÇÃO GERAL do hóspede (a mais fiel à percepção dele)
-        // 2º critério (fallback): média geral de todas as notas
+        // 2. Se não encontrou no texto, verifica notas críticas (≤ 3)
+        const SECTOR_BY_RATING_KEY: Record<string, string> = {
+          wifi: "Wifi", alimentacao: "AeB", bebidas: "AeB", boutique: "AeB",
+          limpezaApartamento: "Governança", areasSociais: "Governança",
+          atendimentoGeral: "Recepção", recepcao: "Recepção",
+          equipeLazer: "Lazer", estruturaLazer: "Lazer", parqueAventuras: "Lazer",
+          estruturaApartamento: "Estrutura", satisfacaoGeral: "Recepção"
+        };
+
+        const ratingEntries = Object.entries(ratings)
+          .filter(([, v]) => v !== undefined && v !== null) as [string, number][];
+
+        if (!sector) {
+          // Pega o setor da pior nota, mas SÓ se for ≤ 3 (ponto de atenção real)
+          let worstScore = 11;
+          let worstSector = "";
+          ratingEntries.forEach(([k, v]) => {
+            if (v <= 3 && v < worstScore) {
+              worstScore = v;
+              worstSector = SECTOR_BY_RATING_KEY[k] || "";
+            }
+          });
+          sector = worstSector || "Geral";
+        }
+
+        const activeScores = ratingEntries.map(([, v]) => v);
+
+        // ── TIPO DE OCORRÊNCIA ───────────────────────────────────────────────
+        // Usa satisfação geral como critério principal.
         // Só classifica como Reclamação se a satisfação geral for ≤ 3,
         // ou se não houver satisfação geral e a média das notas for ≤ 3.
         let occurrenceType = "Feedback positivo";
         if (activeScores.length > 0) {
           const satisfacaoGeral = (ratings as any)["satisfacaoGeral"];
           if (satisfacaoGeral !== null && satisfacaoGeral !== undefined) {
-            // Usa satisfação geral como critério principal
             if (satisfacaoGeral <= 3) occurrenceType = "Reclamação";
           } else {
-            // Fallback: média geral de todas as notas
             const avgScore = activeScores.reduce((a, b) => a + b, 0) / activeScores.length;
             if (avgScore <= 3) occurrenceType = "Reclamação";
           }
