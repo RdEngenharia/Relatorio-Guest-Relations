@@ -332,8 +332,13 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
         const apartment = firstRow.apartment || "N/A";
         const userName = firstRow.userName || "Hóspede";
 
-        if (!commentText) {
-          commentText = `Pesquisa de satisfação preenchida por ${userName} (Quarto ${apartment}).`;
+        // Sempre identifica o hóspede na observação.
+        // Se houver comentário, inclui depois do nome. Se não houver, usa texto padrão.
+        const prefix = `${userName} (Quarto ${apartment})`;
+        if (commentText) {
+          commentText = `${prefix}: ${commentText}`;
+        } else {
+          commentText = `Pesquisa de satisfação preenchida por ${prefix}.`;
         }
         if (sessions.length > 1) {
           commentText += ` (Média consolidada de ${sessions.length} respostas enviadas no mesmo dia.)`;
