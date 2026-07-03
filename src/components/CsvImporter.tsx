@@ -393,8 +393,8 @@ export default function CsvImporter({ onImportFinished, onCancel }: CsvImporterP
           .filter(([, v]) => v !== undefined && v !== null) as [string, number][];
 
         if (!sector) {
-          // Pega o setor da pior nota, mas SÓ se for ≤ 3 (ponto de atenção real)
-          let worstScore = 11;
+          // Pega o setor da PIOR nota absoluta, mas SÓ se essa nota for ≤ 3
+          let worstScore = 4; // limiar: só considera notas críticas (≤ 3)
           let worstSector = "";
           ratingEntries.forEach(([k, v]) => {
             if (v <= 3 && v < worstScore) {
