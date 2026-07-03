@@ -226,8 +226,8 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
   const current = STEPS[step];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm print:hidden" style={{ padding: '20px' }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" style={{ maxHeight: 'min(90vh, 700px)' }}>
 
         {/* Header colorido */}
         <div className={`bg-gradient-to-br ${current.color} text-white p-6 flex items-start gap-4 shrink-0`}>
