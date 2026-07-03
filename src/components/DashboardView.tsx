@@ -280,14 +280,18 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
             className="text-xs rounded-lg border border-luxury-200 bg-luxury-50 px-2.5 py-1.5 outline-none focus:border-brass-500" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
-            <Printer className="w-3.5 h-3.5" /> Imprimir Gráficos
-          </button>
-          <button onClick={() => setPrintSectorModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
-            <MessageSquare className="w-3.5 h-3.5" /> Imprimir Comentários
-          </button>
+          {activeTab === "graficos" && (
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
+              <Printer className="w-3.5 h-3.5" /> Imprimir Gráficos
+            </button>
+          )}
+          {(activeTab === "avaliacoes" || activeTab === "editar") && (
+            <button onClick={() => setPrintSectorModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
+              <MessageSquare className="w-3.5 h-3.5" /> Imprimir Comentários
+            </button>
+          )}
         </div>
       </div>
 
