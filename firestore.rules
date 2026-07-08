@@ -42,7 +42,7 @@ service cloud.firestore {
     function isValidOccurrence(occ) {
       return occ.keys().hasAll(['date', 'bookingNumber', 'apartment', 'occurrenceType', 'sector', 'observation', 'createdAt', 'updatedAt'])
         && (occ.keys().size() >= 8 && occ.keys().size() <= 12)
-        && (!occ.keys().hasAll(['source']) || occ.source == null || (occ.source is string && (occ.source == 'resort' || occ.source == 'google' || occ.source == 'flexspot')))
+        && (!occ.keys().hasAll(['source']) || occ.source == null || (occ.source is string && (occ.source == 'resort' || occ.source == 'google' || occ.source == 'flexspot' || occ.source == 'organic')))
         && (!occ.keys().hasAll(['ratings']) || occ.ratings == null || occ.ratings is map)
         && (!occ.keys().hasAll(['generalInfo']) || occ.generalInfo == null || occ.generalInfo is map)
         && occ.date is string && occ.date.size() <= 32
