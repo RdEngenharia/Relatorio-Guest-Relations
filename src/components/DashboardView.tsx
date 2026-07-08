@@ -284,7 +284,7 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
               <Printer className="w-3.5 h-3.5" /> Imprimir Gráficos
             </button>
           )}
-          {(activeTab === "avaliacoes" || activeTab === "editar") && (
+          {activeTab === "avaliacoes" && (
             <button onClick={() => setPrintSectorModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all cursor-pointer">
               <MessageSquare className="w-3.5 h-3.5" /> Imprimir Comentários
@@ -414,7 +414,7 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
       {/* ══ ABA LISTA DE AVALIAÇÕES ══ */}
       {(activeTab === "avaliacoes" || activeTab === "editar") && (
         <div className="space-y-4">
-          {/* Barra de busca */}
+          {/* Barra de busca + botão Nova Avaliação */}
           {activeTab === "avaliacoes" && (
             <div className="flex gap-3 items-center print:hidden">
               <div className="relative flex-1">
@@ -423,20 +423,28 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
                   value={search} onChange={e => setSearch(e.target.value)}
                   className="w-full text-sm pl-9 pr-4 py-2.5 rounded-xl border border-luxury-200 bg-white focus:border-brass-500 focus:ring-1 focus:ring-brass-500 outline-none" />
               </div>
+              <button
+                onClick={() => { setEditingOccurrence(null); setActiveTab("editar"); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-luxury-800 hover:bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-xs shrink-0">
+                <span className="text-brass-400 text-base leading-none">+</span>
+                Nova Avaliação
+              </button>
             </div>
           )}
 
-          {/* Formulário de edição */}
-          {activeTab === "editar" && editingOccurrence && (
+          {/* Formulário de edição OU nova avaliação orgânica */}
+          {activeTab === "editar" && (
             <div className="max-w-3xl mx-auto">
-              <div className="mb-4 p-3 bg-brass-500/10 border border-brass-200/50 rounded-xl flex items-center gap-3">
-                <Pencil className="w-4 h-4 text-brass-600 shrink-0" />
-                <div className="flex-1 text-xs text-brass-700">
-                  <strong>Editando avaliação</strong> — Apto {editingOccurrence.apartment} • {editingOccurrence.bookingNumber} • {editingOccurrence.date}
+              {editingOccurrence && (
+                <div className="mb-4 p-3 bg-brass-500/10 border border-brass-200/50 rounded-xl flex items-center gap-3">
+                  <Pencil className="w-4 h-4 text-brass-600 shrink-0" />
+                  <div className="flex-1 text-xs text-brass-700">
+                    <strong>Editando avaliação</strong> — Apto {editingOccurrence.apartment} • {editingOccurrence.bookingNumber} • {editingOccurrence.date}
+                  </div>
+                  <button onClick={() => { setEditingOccurrence(null); setActiveTab("avaliacoes"); }}
+                    className="text-xs font-bold text-neutral-500 hover:text-neutral-700 cursor-pointer underline">Cancelar</button>
                 </div>
-                <button onClick={() => { setEditingOccurrence(null); setActiveTab("avaliacoes"); }}
-                  className="text-xs font-bold text-neutral-500 hover:text-neutral-700 cursor-pointer underline">Cancelar</button>
-              </div>
+              )}
               <OccurrenceForm
                 editingOccurrence={editingOccurrence}
                 onSaveFinished={() => { setEditingOccurrence(null); setActiveTab("avaliacoes"); }}
