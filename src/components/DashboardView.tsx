@@ -59,9 +59,8 @@ const RATING_CATEGORIES = [
   { key: "parqueAventuras",      label: "Parque de Aventuras", color: "#059669" },
 ];
 
-// Avaliações orgânicas (sem pontuação Flexspot) recebem nota 5 em todas as categorias
-// para fins de cálculo — isso garante que não "puxem a média para baixo" por ausência.
-const ORGANIC_DEFAULT_SCORE = 5;
+// Avaliações orgânicas (sem ratings) NÃO entram no cálculo do gráfico.
+// Só registros com notas reais do Flexspot são considerados nas médias.
 
 const normalizeScore = (v: any): number | null => {
   if (v === null || v === undefined) return null;
@@ -95,24 +94,21 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
     occurrences.filter(o => o.date >= startDate && o.date <= endDate)
   , [occurrences, startDate, endDate]);
 
-  // ── Calcula stats Flexspot:
-  // Avaliações COM ratings → usa as notas reais
-  // Avaliações SEM ratings (orgânicas) → usa nota 5 em todas as categorias
+  // Só registros COM ratings reais do Flexspot entram no cálculo de médias.
+  // Avaliações orgânicas são ignoradas pelo gráfico.
   const flexspotStats = useMemo(() => {
     const sums: Record<string, number> = {};
     const counts: Record<string, number> = {};
     RATING_CATEGORIES.forEach(c => { sums[c.key] = 0; counts[c.key] = 0; });
 
+    let organicCount = 0;
+
     allInPeriod.forEach(occ => {
       const hasRatings = occ.ratings && Object.values(occ.ratings).some(v => v !== null && v !== undefined);
+      if (!hasRatings) { organicCount++; return; } // orgânico — ignora no gráfico
       RATING_CATEGORIES.forEach(c => {
-        const score = hasRatings
-          ? normalizeScore((occ.ratings as any)?.[c.key])
-          : ORGANIC_DEFAULT_SCORE;
-        if (score !== null) {
-          sums[c.key] += score;
-          counts[c.key]++;
-        }
+        const score = normalizeScore((occ.ratings as any)?.[c.key]);
+        if (score !== null) { sums[c.key] += score; counts[c.key]++; }
       });
     });
 
@@ -128,12 +124,13 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
       ? Number((valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1))
       : null;
 
-    // Dados para o gráfico de barras VERTICAL (para impressão PDF)
     const barData = RATING_CATEGORIES
       .filter(c => counts[c.key] > 0)
       .map(c => ({ name: c.label, value: averages[c.key], color: c.color }));
 
-    return { averages, counts, overall, total: allInPeriod.length, barData };
+    const flexspotCount = allInPeriod.length - organicCount;
+
+    return { averages, counts, overall, total: allInPeriod.length, flexspotCount, organicCount, barData };
   }, [allInPeriod]);
 
   // ── Lista de avaliações com busca ──
@@ -354,7 +351,13 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
               </h3>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-neutral-400">
-                  {flexspotStats.total} avaliação(ões) • Nota geral: <strong className="text-neutral-700">{flexspotStats.overall ?? "—"}/5</strong>
+                  {flexspotStats.flexspotCount} com nota
+                  {flexspotStats.organicCount > 0 && (
+                    <span className="text-amber-600 font-bold ml-1">• {flexspotStats.organicCount} orgânica(s) aguardando nota</span>
+                  )}
+                  {flexspotStats.overall !== null && (
+                    <span className="ml-1">• Nota geral: <strong className="text-neutral-700">{flexspotStats.overall}/5</strong></span>
+                  )}
                 </span>
                 {onClearFlexspotData && (
                   <button onClick={() => setShowClearFlexspot(true)}
@@ -468,6 +471,11 @@ export default function DashboardView({ occurrences, onClearFlexspotData, onClea
                               {occ.occurrenceType}
                             </span>
                             {isFlexspot && <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">Flexspot</span>}
+                    {!isFlexspot && occ.source === "organic" && (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        🔔 Orgânico — aguardando nota
+                      </span>
+                    )}
                           </div>
                           <p className="text-xs text-neutral-600 leading-relaxed line-clamp-2 font-serif">{occ.observation}</p>
                         </div>
