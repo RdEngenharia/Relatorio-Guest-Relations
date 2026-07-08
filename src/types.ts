@@ -20,6 +20,7 @@ export interface Ratings {
 export interface GeneralInfo {
   primeiraVez?: string | null; // "Sim" | "Não"
   comentariosGerais?: string | null;
+  guestName?: string | null; // Nome do hóspede em avaliações orgânicas (para merge futuro com Flexspot)
 }
 
 export interface Occurrence {
@@ -28,9 +29,9 @@ export interface Occurrence {
   bookingNumber: string;
   apartment: string;
   occurrenceType: string; // "Reclamação" | "Feedback positivo" | "Outro"
-  sector: string; // "AeB" | "Estrutura" | "TI" | "Lazer" | "Manutenção" | "Governança" | "Recepção" | "All inclusive" | "Wifi" | "Programações" | "Outro"
+  sector: string; // "AeB" | "Estrutura" | "TI" | "Lazer" | "Manutenção" | "Governança" | "Recepção" | "All inclusive" | "Wifi" | "Programações" | "Geral" | "Outro"
   observation: string;
-  source?: "resort" | "google" | "flexspot";
+  source?: "resort" | "google" | "flexspot" | "organic";
   ratings?: Ratings;
   generalInfo?: GeneralInfo;
   createdAt: any; // ServerTimestamp
