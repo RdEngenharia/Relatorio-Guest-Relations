@@ -92,8 +92,12 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || !bookingNumber.trim() || !apartment.trim() || !observation.trim()) {
+    if (!date || !apartment.trim() || !observation.trim() || (!editingOccurrence && !guestName.trim())) {
       setNotification({ type: "error", msg: "Por favor, preencha todos os campos obrigatórios." });
+      return;
+    }
+    if (editingOccurrence && !bookingNumber.trim()) {
+      setNotification({ type: "error", msg: "Por favor, preencha o Nº de Reserva." });
       return;
     }
 
