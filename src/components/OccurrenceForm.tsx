@@ -59,6 +59,7 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
   const [date, setDate]                     = useState(getTodayISOString());
   const [bookingNumber, setBookingNumber]   = useState("");
   const [apartment, setApartment]           = useState("");
+  const [guestName, setGuestName]           = useState("");
   const [occurrenceType, setOccurrenceType] = useState("Reclamação");
   const [sector, setSector]                 = useState("AeB");
   const [observation, setObservation]       = useState("");
@@ -82,6 +83,7 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
     setDate(getTodayISOString());
     setBookingNumber("");
     setApartment("");
+    setGuestName("");
     setOccurrenceType("Reclamação");
     setSector("AeB");
     setObservation("");
@@ -98,18 +100,27 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
     setSubmitLoading(true);
     setNotification(null);
 
-    const docId = editingOccurrence ? editingOccurrence.id : `occ_${Date.now()}`;
+    const isOrganic = !editingOccurrence;
+    const docId = editingOccurrence ? editingOccurrence.id : `organic_${Date.now()}`;
+
+    // Para avaliações orgânicas, o nome do hóspede é salvo em generalInfo
+    // para que o algoritmo de merge do Flexspot possa encontrá-lo depois
+    // pelo critério: apartamento + nome + data
     const payload: any = {
       date,
-      bookingNumber: bookingNumber.trim(),
+      bookingNumber: bookingNumber.trim() || `ORG-${apartment.trim()}-${Date.now().toString().slice(-4)}`,
       apartment: apartment.trim(),
       occurrenceType,
-      sector,
+      sector: sector || "Geral",
       observation: observation.trim(),
-      source: editingOccurrence?.source || "resort",
+      source: editingOccurrence?.source || (isOrganic ? "organic" : "resort"),
       createdAt: editingOccurrence ? editingOccurrence.createdAt : serverTimestamp(),
       updatedAt: serverTimestamp()
     };
+
+    if (isOrganic && guestName.trim()) {
+      payload.generalInfo = { guestName: guestName.trim() };
+    }
 
     // Preserva ratings e generalInfo existentes ao editar
     if (editingOccurrence?.ratings) payload.ratings = editingOccurrence.ratings;
@@ -152,9 +163,22 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
         </div>
       )}
 
-      <h3 className="text-base font-semibold font-display text-neutral-800 mb-6">
-        {editingOccurrence ? "Editar Avaliação" : "Nova Avaliação"}
+      <h3 className="text-base font-semibold font-display text-neutral-800 mb-2">
+        {editingOccurrence ? "Editar Avaliação" : "Nova Avaliação Orgânica"}
       </h3>
+
+      {/* Aviso de avaliação orgânica */}
+      {!editingOccurrence && (
+        <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <span className="text-lg shrink-0">🔔</span>
+          <div>
+            <p className="text-xs font-bold text-amber-700">Avaliação registrada organicamente</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Esta avaliação <strong>não terá pontuação</strong> e <strong>não entrará no gráfico</strong> até que o hóspede responda a pesquisa no Flexspot. Ela serve para registrar o atendimento e acompanhamento da equipe.
+            </p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -166,8 +190,11 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
               className="w-full text-sm rounded-xl border border-luxury-200 bg-luxury-50 px-3.5 py-2.5 focus:border-brass-500 focus:ring-1 focus:ring-brass-500 transition-all outline-none" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1.5 uppercase tracking-wider">Nº Reserva *</label>
-            <input type="text" required placeholder="Ex: 117228" value={bookingNumber} onChange={e => setBookingNumber(e.target.value)}
+            <label className="block text-xs font-medium text-neutral-500 mb-1.5 uppercase tracking-wider">
+              Nº Reserva {editingOccurrence ? "*" : <span className="text-neutral-400 normal-case">(opcional)</span>}
+            </label>
+            <input type="text" placeholder="Ex: 117228" value={bookingNumber} onChange={e => setBookingNumber(e.target.value)}
+              required={!!editingOccurrence}
               className="w-full text-sm rounded-xl border border-luxury-200 bg-luxury-50 px-3.5 py-2.5 focus:border-brass-500 focus:ring-1 focus:ring-brass-500 transition-all outline-none" />
           </div>
           <div>
@@ -176,6 +203,18 @@ export default function OccurrenceForm({ editingOccurrence, onSaveFinished, onCa
               className="w-full text-sm rounded-xl border border-luxury-200 bg-luxury-50 px-3.5 py-2.5 focus:border-brass-500 focus:ring-1 focus:ring-brass-500 transition-all outline-none" />
           </div>
         </div>
+
+        {/* Nome do hóspede — essencial para orgânicos (permite merge futuro com Flexspot) */}
+        {!editingOccurrence && (
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1.5 uppercase tracking-wider">
+              Nome do Hóspede *
+              <span className="text-amber-600 text-[10px] normal-case font-normal ml-1">(usado para localizar a avaliação do Flexspot depois)</span>
+            </label>
+            <input type="text" required placeholder="Ex: João Silva" value={guestName} onChange={e => setGuestName(e.target.value)}
+              className="w-full text-sm rounded-xl border border-luxury-200 bg-luxury-50 px-3.5 py-2.5 focus:border-brass-500 focus:ring-1 focus:ring-brass-500 transition-all outline-none" />
+          </div>
+        )}
 
         {/* Tipo e Setor */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
